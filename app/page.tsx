@@ -1,24 +1,24 @@
 // Filename: app/chat/page.tsx
 "use client";
 
-import { useChat, Message } from "@ai-sdk/react";
-import { ArrowUp, Sparkles, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button"; // Assuming path is correct
-import { Textarea } from "@/components/ui/textarea"; // Assuming path is correct
+import { Message } from "@ai-sdk/react";
+import { ArrowUp, Sparkles, Loader2, Image as ImageIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { atomDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
-import { CraftsmenGrid } from "@/components/ui/CraftsmenGrid"; // Assuming path is correct
+import { CraftsmenGrid } from "@/components/ui/CraftsmenGrid";
 import {
   extractCraftsmanData,
   messageContainsCraftsmanData,
-} from "@/lib/extract-craftsman-data"; // Assuming path is correct
+} from "@/lib/extract-craftsman-data";
 import Image from "next/image";
 
 const api = "/api/chat";
 
-// Define the Craftsman type (ensure properties match your data structure)
+// Define the Craftsman type
 interface Craftsman {
   id: string;
   name: string;
@@ -53,7 +53,7 @@ const CodeBlock: React.FC<CodeProps> = ({
   const match = /language-(\w+)/.exec(className || "");
   return !inline && match ? (
     <SyntaxHighlighter
-      style={atomDark} // Choose your desired theme
+      style={atomDark}
       language={match[1]}
       PreTag="div"
       {...props}
@@ -68,16 +68,27 @@ const CodeBlock: React.FC<CodeProps> = ({
 };
 
 export default function Chat() {
-  const { messages, input, handleInputChange, handleSubmit, isLoading } =
-    useChat({
-      api,
-    });
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  // Local state for user and assistant messages
+  const [userMessages, setUserMessages] = useState<Message[]>([]);
+  const [assistantMessages, setAssistantMessages] = useState<Message[]>([]);
+  // Combine user and assistant messages for rendering
+  const allMessages = [...userMessages, ...assistantMessages].sort(
+    (a, b) =>
+      new Date(a.createdAt ?? Date.now()).getTime() -
+      new Date(b.createdAt ?? Date.now()).getTime()
+  );
 
-  // State to hold extracted card data mapped by message ID
+  // State for image upload
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // State for extracted card data and processing
   const [extractedCardData, setExtractedCardData] = useState<
     Record<string, Craftsman[]>
   >({});
-  // State to track IDs of messages currently being processed for card data
   const [processingMessageIds, setProcessingMessageIds] = useState<Set<string>>(
     new Set()
   );
@@ -107,71 +118,180 @@ export default function Chat() {
   }, [input, isMobile]);
 
   useEffect(() => {
-    // Scroll logic adjusted to avoid scrolling during processing if preferred,
-    // but generally scrolling to the latest message/indicator is fine.
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, processingMessageIds]); // Add processingMessageIds if you want scroll behavior tied to it
+  }, [allMessages, processingMessageIds]);
+
+  // Log messages for debugging
+  useEffect(() => {
+    console.log("All messages:", allMessages);
+  }, [allMessages]);
 
   // --- Effect for Data Extraction ---
   useEffect(() => {
-    const lastMessage = messages[messages.length - 1];
-    const messageId = lastMessage?.id; // Get ID early
+    const lastMessage = allMessages[allMessages.length - 1];
+    const messageId = lastMessage?.id;
 
     if (
-      messageId && // Ensure messageId exists
+      messageId &&
       lastMessage.role === "assistant" &&
-      !isLoading && // Process when loading finishes for the *whole chat*
-      extractedCardData[messageId] === undefined && // Only process if not already attempted/done
-      !processingMessageIds.has(messageId) // Double check not already processing (safety)
+      !isLoading &&
+      extractedCardData[messageId] === undefined &&
+      !processingMessageIds.has(messageId)
     ) {
-      const textPart = lastMessage.parts.find(
-        (part) => part.type === "text"
-      )?.text;
+      const textPart = Array.isArray(lastMessage.content)
+        ? lastMessage.content.find((part) => part.type === "text")?.text
+        : lastMessage.content;
 
       if (textPart && messageContainsCraftsmanData(textPart)) {
-        // *** Mark message as processing START ***
         setProcessingMessageIds((prev) => new Set(prev).add(messageId));
-        // console.log(`Message ${messageId}: START processing`);
-
-        // Use a microtask to allow state update before heavy extraction potentially blocks
         queueMicrotask(() => {
           let data: Craftsman[] = [];
           try {
             data = extractCraftsmanData(textPart);
-            // console.log(`Message ${messageId}: Extraction result ->`, data);
           } catch (extractionError) {
             console.error(
               `Message ${messageId}: Error during extraction ->`,
               extractionError
             );
           } finally {
-            // Store the result (could be empty array)
             setExtractedCardData((prev) => ({ ...prev, [messageId]: data }));
-            // *** Mark message as processing END ***
             setProcessingMessageIds((prev) => {
               const next = new Set(prev);
               next.delete(messageId);
-              // console.log(`Message ${messageId}: END processing`);
               return next;
             });
           }
         });
       } else {
-        // Message doesn't contain data markers, mark extraction as done (with empty result)
-        // No need to mark as 'processing' visually as it should be quick
         if (textPart && !messageContainsCraftsmanData(textPart)) {
           setExtractedCardData((prev) => ({ ...prev, [messageId]: [] }));
         }
-        // console.log(`Message ${messageId}: Not attempting extraction (no data markers).`);
       }
     }
-    // Depend on messages, isLoading, and the state maps
-  }, [messages, isLoading, extractedCardData, processingMessageIds]);
+  }, [allMessages, isLoading, extractedCardData, processingMessageIds]);
+
+  // --- Image Upload Handlers ---
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    console.log("Selected file:", file);
+    if (file && file.type.startsWith("image/")) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert("الصورة كبيرة جدًا. يرجى اختيار صورة أقل من 5 ميغابايت.");
+        return;
+      }
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+        console.log("Image preview set:", reader.result);
+      };
+      reader.onerror = () => {
+        console.error("Error reading file for preview");
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setSelectedImage(null);
+      setImagePreview(null);
+      console.log("No valid image selected");
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+  };
+
+  const handleCustomSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log("Submitting form, selectedImage:", selectedImage, "input:", input);
+    if (!input.trim() && !selectedImage) {
+      console.log("No input or image provided, submission aborted");
+      return;
+    }
+
+    setIsLoading(true);
+
+    let messageContent: Message["content"];
+    if (selectedImage) {
+      try {
+        const base64Image = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error("Failed to read image"));
+          reader.readAsDataURL(selectedImage);
+        });
+        console.log("Base64 image generated, length:", base64Image.length);
+        messageContent = [
+          { type: "text", text: input.trim() || "وصف الصورة" },
+          { type: "image", image: base64Image },
+        ];
+      } catch (error) {
+        console.error("Error converting image to base64:", error);
+        alert("حدث خطأ أثناء معالجة الصورة. يرجى المحاولة مرة أخرى.");
+        setIsLoading(false);
+        return;
+      }
+    } else {
+      messageContent = input.trim();
+      console.log("No image, using text only:", messageContent);
+    }
+
+    console.log("Submitting message content:", JSON.stringify(messageContent));
+
+    // Add user message to local state
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: messageContent,
+      createdAt: new Date(),
+    };
+    setUserMessages((prev) => [...prev, newMessage]);
+
+    // Send to backend via custom fetch
+    try {
+      const response = await fetch(api, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [...allMessages, newMessage],
+        }),
+      });
+      console.log("Response status:", response.status, response.statusText);
+      const responseText = await response.text(); // Get raw response
+      console.log("Raw response:", responseText);
+      if (!response.ok) {
+        throw new Error(`Backend error: ${response.statusText}, Response: ${responseText}`);
+      }
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error("Failed to parse response as JSON:", parseError);
+        throw new Error(`Invalid JSON response: ${responseText}`);
+      }
+      console.log("Backend response:", result);
+
+      // Add assistant response to local state
+      if (result && result.role === "assistant") {
+        setAssistantMessages((prev) => [...prev, result]);
+      } else {
+        console.warn("No assistant response in result:", result);
+      }
+    } catch (error) {
+      console.error("Error sending message to backend:", error);
+      alert("حدث خطأ أثناء إرسال الرسالة: " + (error.message || "خطأ غير معروف"));
+    }
+
+    setIsLoading(false);
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setInput("");
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey && !isMobile && !isLoading) {
       e.preventDefault();
-      handleSubmit(e as unknown as React.FormEvent);
+      handleCustomSubmit(e as unknown as React.FormEvent);
     }
   };
 
@@ -197,8 +317,7 @@ export default function Chat() {
       {/* Messages */}
       <main className="flex-1 overflow-y-auto p-4">
         <div className="max-w-3xl mx-auto space-y-6">
-          {/* Initial Placeholder Message */}
-          {messages.length === 0 && !isLoading && (
+          {allMessages.length === 0 && !isLoading && (
             <div className="flex flex-col items-center justify-center h-full text-slate-500 py-16">
               <Sparkles className="h-8 w-8 mb-4 text-indigo-500" />
               <div className="text-lg font-medium">
@@ -210,163 +329,144 @@ export default function Chat() {
             </div>
           )}
 
-          {/* Chat Messages */}
-          {messages.map((message) => {
-            // --- RENDER THE MESSAGE BUBBLE ---
-            return (
+          {allMessages.map((message) => (
+            <div
+              key={message.id}
+              className={`flex ${
+                message.role === "user" ? "justify-end" : "justify-start"
+              }`}
+            >
               <div
-                key={message.id} // Use message.id here
-                className={`flex ${
-                  message.role === "user" ? "justify-end" : "justify-start"
+                className={`rounded-2xl px-4 py-3 max-w-[85%] shadow-sm ${
+                  message.role === "user"
+                    ? "bg-indigo-600 text-white"
+                    : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
                 }`}
               >
-                <div
-                  className={`rounded-2xl px-4 py-3 max-w-[85%] shadow-sm ${
-                    message.role === "user"
-                      ? "bg-indigo-600 text-white"
-                      : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
-                  }`}
-                >
-                  {/* --- Content Rendering Logic --- */}
-                  {message.role === "assistant" ? (
-                    // --- Assistant Message ---
-                    (() => {
-                      // Use IIFE to manage complex conditional logic cleanly
-                      const messageId = message.id;
-                      const isProcessing = processingMessageIds.has(messageId);
-                      // Check if it's the last message and chat is globally loading AND we haven't finished processing
-                      const cardData = extractedCardData[messageId]; // Can be undefined, [], or Craftsman[]
-                      const isPotentiallyLoadingStream =
-                        isLoading &&
-                        messages[messages.length - 1]?.id === messageId &&
-                        cardData === undefined;
-
-                      return (
-                        <div className="flex gap-2 items-start">
-                          {/* Assistant Icon */}
-                          <div className="h-8 w-8 p-1.5 shrink-0 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-indigo-600 dark:text-indigo-300">
-                            <Sparkles className="w-5 h-5" />
-                          </div>
-                          {/* Assistant Content Area */}
-                          <div className="min-w-0 flex-1">
-                            {isProcessing || isPotentiallyLoadingStream ? (
-                              // --- Show Loading/Processing within Bubble ---
-                              <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 h-6">
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span>
-                                  {isProcessing
-                                    ? "جاري تجهيز المعلومات..."
-                                    : "لحظة من فضلك..."}
-                                </span>
-                              </div>
-                            ) : (
-                              // --- Show Final Content (Intro + Cards OR Full Text) ---
-                              <>
-                                {cardData && cardData.length > 0 ? (
-                                  // Data Extracted: Show Intro (if any)
-                                  <>
-                                    {(() => {
-                                      // Calculate intro text ONLY when needed
-                                      const messageTextContent = message.parts
-                                        .filter((p) => p.type === "text")
-                                        .map((p) => p.text)
-                                        .join("\n");
-                                      const firstMarkerIndex =
-                                        messageTextContent.indexOf(
-                                          "--- المستند"
-                                        );
-                                      let intro = "";
-                                      if (firstMarkerIndex >= 0) {
-                                        intro = messageTextContent
-                                          .substring(0, firstMarkerIndex)
-                                          .trim();
-                                      }
-                                      return intro ? (
-                                        <div className="prose prose-sm max-w-none dark:prose-invert mb-2">
-                                          <ReactMarkdown
-                                            components={{ code: CodeBlock }}
-                                          >
-                                            {intro}
-                                          </ReactMarkdown>
-                                        </div>
-                                      ) : null;
-                                    })()}
-                                    {/* Cards are rendered below */}
-                                  </>
-                                ) : (
-                                  // No Data Extracted OR Processing finished with no cards: Show full original text
-                                  <div className="prose prose-sm max-w-none dark:prose-invert">
-                                    {message.parts.map((part, i) =>
-                                      part.type === "text" ? (
-                                        <ReactMarkdown
-                                          key={`${messageId}-part-${i}`}
-                                          components={{ code: CodeBlock }}
-                                        >
-                                          {part.text}
-                                        </ReactMarkdown>
-                                      ) : null
-                                    )}
-                                  </div>
-                                )}
-
-                                {/* Render Cards (only if processing done and data exists) */}
-                                {cardData && cardData.length > 0 && (
-                                  <div className="mt-4">
-                                    <CraftsmenGrid craftsmen={cardData} />
-                                  </div>
-                                )}
-                              </>
-                            )}
-                          </div>
+                {message.role === "assistant" ? (
+                  <div className="flex gap-2 items-start">
+                    <div className="h-8 w-8 p-1.5 shrink-0 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-indigo-600 dark:text-indigo-300">
+                      <Sparkles className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      {processingMessageIds.has(message.id) ||
+                      (isLoading &&
+                        allMessages[allMessages.length - 1]?.id === message.id &&
+                        !extractedCardData[message.id]) ? (
+                        <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 h-6">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>
+                            {processingMessageIds.has(message.id)
+                              ? "جاري تجهيز المعلومات..."
+                              : "لحظة من فضلك..."}
+                          </span>
                         </div>
-                      );
-                    })() // End of IIFE
-                  ) : (
-                    // --- User Message ---
-                    <div className="prose prose-sm prose-invert max-w-none">
-                      {message.parts.map((part, i) =>
+                      ) : (
+                        <>
+                          {extractedCardData[message.id]?.length > 0 ? (
+                            <>
+                              {(() => {
+                                const messageTextContent = Array.isArray(
+                                  message.content
+                                )
+                                  ? message.content
+                                      .filter((p) => p.type === "text")
+                                      .map((p) => p.text)
+                                      .join("\n")
+                                  : message.content;
+                                const firstMarkerIndex =
+                                  messageTextContent.indexOf("--- المستند");
+                                let intro = "";
+                                if (firstMarkerIndex >= 0) {
+                                  intro = messageTextContent
+                                    .substring(0, firstMarkerIndex)
+                                    .trim();
+                                }
+                                return intro ? (
+                                  <div className="prose prose-sm max-w-none dark:prose-invert mb-2">
+                                    <ReactMarkdown
+                                      components={{ code: CodeBlock }}
+                                    >
+                                      {intro}
+                                    </ReactMarkdown>
+                                  </div>
+                                ) : null;
+                              })()}
+                            </>
+                          ) : (
+                            <div className="prose prose-sm max-w-none dark:prose-invert">
+                              {Array.isArray(message.content) ? (
+                                message.content.map((part, i) =>
+                                  part.type === "text" ? (
+                                    <ReactMarkdown
+                                      key={`${message.id}-part-${i}`}
+                                      components={{ code: CodeBlock }}
+                                    >
+                                      {part.text}
+                                    </ReactMarkdown>
+                                  ) : part.type === "image" ? (
+                                    <img
+                                      key={`${message.id}-part-${i}`}
+                                      src={part.image}
+                                      alt="Assistant provided image"
+                                      className="max-w-full rounded-lg mt-2"
+                                    />
+                                  ) : null
+                                )
+                              ) : (
+                                <ReactMarkdown components={{ code: CodeBlock }}>
+                                  {message.content}
+                                </ReactMarkdown>
+                              )}
+                            </div>
+                          )}
+                          {extractedCardData[message.id]?.length > 0 && (
+                            <div className="mt-4">
+                              <CraftsmenGrid
+                                craftsmen={extractedCardData[message.id]}
+                              />
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="prose prose-sm prose-invert max-w-none">
+                    {Array.isArray(message.content) ? (
+                      message.content.map((part: any, i: number) =>
                         part.type === "text" ? (
                           <ReactMarkdown key={`${message.id}-part-${i}`}>
                             {part.text}
                           </ReactMarkdown>
+                        ) : part.type === "image" ? (
+                          <img
+                            key={`${message.id}-part-${i}`}
+                            src={part.image}
+                            alt="User uploaded image"
+                            className="max-w-full rounded-lg mt-2"
+                          />
                         ) : null
-                      )}
-                    </div>
-                  )}
+                      )
+                    ) : (
+                      <ReactMarkdown>{message.content}</ReactMarkdown>
+                    )}
+                  </div>
+                )}
 
-                  {/* Timestamp */}
-                  <div className="text-xs mt-1 opacity-70 text-right">
-                    {new Date(
-                      message.createdAt ?? Date.now()
-                    ).toLocaleTimeString([], {
+                <div className="text-xs mt-1 opacity-70 text-right">
+                  {new Date(message.createdAt ?? Date.now()).toLocaleTimeString(
+                    [],
+                    {
                       hour: "2-digit",
                       minute: "2-digit",
                       hour12: true,
-                    })}
-                  </div>
+                    }
+                  )}
                 </div>
               </div>
-            );
-            // --- End of the return statement inside messages.map ---
-          })}
-
-          {/* Loading Indicator (Optional: Could be removed if in-bubble loading is sufficient) */}
-          {/*
-          {isLoading && !messages.some(msg => processingMessageIds.has(msg.id)) && messages[messages.length - 1]?.role !== 'assistant' && (
-             <div className="flex justify-start">
-               <div className="rounded-2xl px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
-                 <div className="flex items-center gap-2">
-                   <div className="h-8 w-8 p-1.5 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center">
-                     <Loader2 className="w-5 h-5 text-indigo-600 dark:text-indigo-300 animate-spin" />
-                   </div>
-                   <div className="text-sm text-slate-500 dark:text-slate-400">جاري التفكير...</div>
-                 </div>
-               </div>
-             </div>
-           )}
-          */}
-
-          {/* Element to scroll to */}
+            </div>
+          ))}
           <div ref={messagesEndRef} />
         </div>
       </main>
@@ -374,34 +474,76 @@ export default function Chat() {
       {/* Input Area */}
       <footer className="p-4 pb-6 bg-white dark:bg-slate-800 border-t">
         <form
-          onSubmit={handleSubmit}
+          onSubmit={handleCustomSubmit}
           className="max-w-3xl mx-auto flex items-end gap-2 border border-slate-300 dark:border-slate-600 p-2 rounded-xl bg-white dark:bg-slate-700 shadow-sm focus-within:ring-2 focus-within:ring-indigo-500"
         >
-          <Textarea
-            ref={textareaRef}
-            className="flex-1 border-none resize-none min-h-[40px] focus:outline-none focus-visible:ring-0 focus-visible:border-none shadow-none bg-transparent dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
-            value={input}
-            placeholder="اسألني عن المشكلة التي تواجهك..."
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            rows={1}
-            style={{
-              maxHeight: isMobile ? "150px" : "200px",
-              overflowY: "auto",
-            }}
-          />
-          <Button
-            type="submit"
-            size="icon"
-            className="h-10 w-10 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={!input.trim() || isLoading}
-          >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <ArrowUp className="h-4 w-4" />
+          <div className="flex flex-col w-full">
+            {imagePreview && (
+              <div className="mb-2">
+                <img
+                  src={imagePreview}
+                  alt="Image preview"
+                  className="max-w-[100px] rounded-lg"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => {
+                    setSelectedImage(null);
+                    setImagePreview(null);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                  className="mt-1"
+                >
+                  إزالة الصورة
+                </Button>
+              </div>
             )}
-          </Button>
+            <div className="flex items-end gap-2">
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                className="h-10 w-10 shrink-0"
+              >
+                <ImageIcon className="h-4 w-4" />
+              </Button>
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                onChange={handleImageChange}
+                className="hidden"
+              />
+              <Textarea
+                ref={textareaRef}
+                className="flex-1 border-none resize-none min-h-[40px] focus:outline-none focus-visible:ring-0 focus-visible:border-none shadow-none bg-transparent dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
+                value={input}
+                placeholder="اسألني عن المشكلة التي تواجهك..."
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                rows={1}
+                style={{
+                  maxHeight: isMobile ? "150px" : "200px",
+                  overflowY: "auto",
+                }}
+              />
+              <Button
+                type="submit"
+                size="icon"
+                className="h-10 w-10 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={(!input.trim() && !selectedImage) || isLoading}
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ArrowUp className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+          </div>
         </form>
         <div className="max-w-3xl mx-auto text-xs text-slate-500 dark:text-slate-400 mt-2 text-center">
           الردود تعتمد على معلومات منصة حرفي. يرجى التحقق دائمًا من التفاصيل
