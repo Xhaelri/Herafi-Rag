@@ -68,6 +68,9 @@ const CodeBlock: React.FC<CodeProps> = ({
   );
 };
 
+// Default text constant for comparison
+const DEFAULT_IMAGE_TEXT = "ايه المشكلة في الصورة هنا؟";
+
 export default function Chat() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -222,7 +225,7 @@ export default function Chat() {
         });
         console.log("Base64 image generated, length:", base64Image.length);
         messageContent = [
-          { type: "text", text: input.trim() || "ايه المشكلة في الصورة هنا؟" },
+          { type: "text", text: input.trim() || DEFAULT_IMAGE_TEXT },
           { type: "image", image: base64Image },
         ];
       } catch (error) {
@@ -490,36 +493,32 @@ export default function Chat() {
                     style={{ color: "#000000" }} // Black text for user messages
                   >
                     {Array.isArray(message.content) ? (
-                      // Check if the message contains an image part
-                      message.content.some((part: any) => part.type === "image") ? (
-                        // Only render the image part if present
-                        message.content.map((part: any, i: number) =>
-                          part.type === "image" ? (
+                      message.content.map((part: any, i: number) => {
+                        // If this part is an image, always render it
+                        if (part.type === "image") {
+                          return (
                             <img
                               key={`${message.id}-part-${i}`}
                               src={part.image}
                               alt="User uploaded image"
                               className="max-w-[200px] rounded-lg mt-2"
                             />
-                          ) : null
-                        )
-                      ) : (
-                        // If no image, render all parts (e.g., text-only messages)
-                        message.content.map((part: any, i: number) =>
-                          part.type === "text" ? (
+                          );
+                        }
+                        // If this part is text, render it only if it's not the default text
+                        if (part.type === "text") {
+                          const isDefaultText = part.text === DEFAULT_IMAGE_TEXT;
+                          if (isDefaultText) {
+                            return null; // Skip rendering the default text
+                          }
+                          return (
                             <ReactMarkdown key={`${message.id}-part-${i}`}>
                               {part.text}
                             </ReactMarkdown>
-                          ) : part.type === "image" ? (
-                            <img
-                              key={`${message.id}-part-${i}`}
-                              src={part.image}
-                              alt="User uploaded image"
-                              className="max-w-full rounded-lg mt-2"
-                            />
-                          ) : null
-                        )
-                      )
+                          );
+                        }
+                        return null;
+                      })
                     ) : (
                       <ReactMarkdown>{message.content}</ReactMarkdown>
                     )}
