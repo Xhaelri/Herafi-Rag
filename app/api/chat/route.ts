@@ -1,4 +1,3 @@
-// Filename: app/api/chat/route.ts
 import { DataAPIClient } from "@datastax/astra-db-ts";
 import { generateId, generateText, Message } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -13,7 +12,6 @@ const {
   GOOGLE_API_KEY,
 } = process.env;
 
-// Verify environment variables
 console.log("Environment check:", {
   hasNamespace: !!ASTRA_DB_NAMESPACE,
   hasCollection: !!ASTRA_DB_COLLECTION,
@@ -37,7 +35,6 @@ export async function POST(req: Request) {
     const { messages } = await req.json();
     const latestMessage = messages[messages.length - 1];
 
-    // Validate input
     if (!latestMessage || (!latestMessage.content && !latestMessage.parts)) {
       return NextResponse.json(
         { error: "Invalid message format" },
@@ -45,10 +42,11 @@ export async function POST(req: Request) {
       );
     }
 
-    // Log message content for debugging
-    console.log("Received message content:", JSON.stringify(latestMessage.content));
+    console.log(
+      "Received message content:",
+      JSON.stringify(latestMessage.content)
+    );
 
-    // Extract text content for embedding (ignore images for vector search)
     let textContent = "";
     if (typeof latestMessage.content === "string") {
       textContent = latestMessage.content;
@@ -60,18 +58,16 @@ export async function POST(req: Request) {
     }
 
     if (!textContent) {
-      textContent = "وصف الصورة"; // Arabic: "Describe the image"
+      textContent = "وصف الصورة";
     }
 
     console.log("Processing query:", textContent.substring(0, 50));
 
-    // Generate embeddings
     console.log("Generating embedding for query...");
     const embeddingResult = await generateSentenceEmbedding(textContent);
     const embeddingVector = embeddingResult.embedding;
     console.log("Embedding vector length:", embeddingVector.length);
 
-    // Retrieve context from Astra DB
     let docContext = "";
     let relevantDocsFound = false;
     try {
@@ -81,7 +77,9 @@ export async function POST(req: Request) {
 
       const documentCheck = await collection.findOne({});
       if (!documentCheck) {
-        console.warn("WARNING: No documents found in collection. Check data loading.");
+        console.warn(
+          "WARNING: No documents found in collection. Check data loading."
+        );
         docContext = "لم يتم العثور على مستندات في قاعدة المعرفة.";
       } else {
         const cursor = collection.find(null, {
@@ -95,7 +93,9 @@ export async function POST(req: Request) {
           collectionName: ASTRA_DB_COLLECTION,
         });
         const documents = await cursor.toArray();
-        console.log(`Found ${documents.length} potential documents via vector search`);
+        console.log(
+          `Found ${documents.length} potential documents via vector search`
+        );
 
         let relevantDocuments = documents;
         if (documents.length > 0 && documents[0]?._similarity !== undefined) {
@@ -160,7 +160,6 @@ export async function POST(req: Request) {
       docContext = "حدث خطأ أثناء استرداد معلومات السياق.";
     }
 
-    // System prompt
     const systemPrompt = `
 أنت مساعد ذكي ومتعاون خاص بموقع حرفي، هدفك الأساسي هو مساعدة المستخدمين في إيجاد حلول لمشاكلهم المنزلية أو اقتراح خدمات الحرفيين عند الحاجة.
 
@@ -204,13 +203,17 @@ ${docContext}
 `;
 
     console.log("System prompt length:", systemPrompt.length);
-    console.log("System prompt preview (Arabic):", systemPrompt.substring(0, 250) + "...");
+    console.log(
+      "System prompt preview (Arabic):",
+      systemPrompt.substring(0, 250) + "..."
+    );
 
     const debugInfo = relevantDocsFound
-      ? `[DEBUG: Found ${docContext.split("--- المستند").length - 1} relevant documents]`
+      ? `[DEBUG: Found ${
+          docContext.split("--- المستند").length - 1
+        } relevant documents]`
       : "[DEBUG: No relevant documents found in the database]";
 
-    // Prepare messages for the model
     const allMessages: Message[] = [
       {
         id: generateId(),
@@ -228,13 +231,15 @@ ${docContext}
           return {
             id: generateId(),
             role: m.role,
-            content: m.content.map((part: any) =>
-              part.type === "text"
-                ? { type: "text", text: part.text }
-                : part.type === "image"
-                ? { type: "image", image: part.image }
-                : null
-            ).filter((part: any) => part !== null),
+            content: m.content
+              .map((part: any) =>
+                part.type === "text"
+                  ? { type: "text", text: part.text }
+                  : part.type === "image"
+                  ? { type: "image", image: part.image }
+                  : null
+              )
+              .filter((part: any) => part !== null),
           };
         }
         return {
@@ -264,7 +269,9 @@ ${docContext}
     });
   } catch (error) {
     console.error("API error:", error);
-    console.error(error instanceof Error ? error.stack : "No stack trace available");
+    console.error(
+      error instanceof Error ? error.stack : "No stack trace available"
+    );
     return NextResponse.json(
       {
         error: "Internal server error",

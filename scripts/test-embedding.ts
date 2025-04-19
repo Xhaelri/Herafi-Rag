@@ -1,14 +1,14 @@
 import { generateSentenceEmbedding } from "../lib/sentence-transformer-embedding";
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
 dotenv.config();
 
 async function testEmbedding() {
   try {
     console.log("Testing embedding pipeline...");
     console.log("API URL:", process.env.SENTENCE_TRANSFORMER_API_URL);
-    
+
     const result = await generateSentenceEmbedding("This is a test sentence.");
-    
+
     console.log("Embedding successfully generated!");
     console.log("Embedding dimension:", result.embedding.length);
     console.log("Model used:", result.model);
@@ -22,5 +22,4 @@ async function testEmbedding() {
   }
 }
 
-// Run the test
 testEmbedding();

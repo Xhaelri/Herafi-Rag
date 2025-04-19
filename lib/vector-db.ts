@@ -14,7 +14,6 @@ if (!ASTRA_DB_API_ENDPOINT || !ASTRA_DB_APPLICATION_TOKEN) {
 const client = new DataAPIClient(ASTRA_DB_APPLICATION_TOKEN);
 const db = client.db(ASTRA_DB_API_ENDPOINT!, { keyspace: ASTRA_DB_NAMESPACE });
 
-// Changed from 768 to 1024 for sentence-transformers/multilingual-e5-large
 const EMBED_DIMENSION = 1024;
 
 type SimilarityMetric = "cosine" | "dot_product" | "euclidean";
@@ -89,7 +88,7 @@ export async function insertVector(
       text,
       embedding,
       metadata,
-      $vector: embedding, // Astra requires $vector field for vector search
+      $vector: embedding,
     };
     const result = await collection.insertOne(doc);
     return result.insertedId;
@@ -105,26 +104,23 @@ export async function insertVector(
 export async function insertManyVectors(
   texts: string[],
   embeddings: number[][],
-  metadata?: Record<string, any>[] // Optional metadata for each document
+  metadata?: Record<string, any>[]
 ): Promise<{ success: boolean; insertedCount: number }> {
   try {
-    // Validate input
     if (texts.length !== embeddings.length) {
       throw new Error("Texts and embeddings arrays must have the same length");
     }
 
     const collection = await getVectorCollection(embeddings[0].length);
 
-    // Prepare documents with optional metadata
     const documents = texts.map((text, index) => ({
       text,
-      embedding: embeddings[index], // Stored for reference
-      $vector: embeddings[index], // Required for vector search
+      embedding: embeddings[index],
+      $vector: embeddings[index],
       createdAt: new Date(),
       ...(metadata && metadata[index] ? { metadata: metadata[index] } : {}),
     }));
 
-    // Batch insert
     const result = await collection.insertMany(documents);
 
     return {
@@ -157,7 +153,6 @@ export async function findSimilarVectors(
     console.log("Searching for similar vectors...");
     console.log(`Vector dimensions: ${embedding.length}`);
 
-    // First, check if we can get a sample document to verify collection structure
     const sampleDoc = await collection.findOne({});
     if (sampleDoc) {
       console.log(
@@ -183,7 +178,6 @@ export async function findSimilarVectors(
       );
     }
 
-    // Perform vector search
     const results = await collection.find(
       {},
       {
@@ -195,9 +189,7 @@ export async function findSimilarVectors(
 
     const documents = await results.toArray();
 
-    // Calculate similarity scores if they're missing
     const documentsWithScores = documents.map((doc) => {
-      // If similarity is undefined, calculate it
       if (doc._similarity === undefined) {
         if ((doc as VectorDoc).$vector) {
           doc._similarity = calculateCosineSimilarity(
@@ -222,7 +214,6 @@ export async function findSimilarVectors(
       return doc;
     });
 
-    // Log detailed information about what was retrieved
     console.log(
       `Retrieved ${documentsWithScores.length} documents from database`
     );
@@ -236,7 +227,6 @@ export async function findSimilarVectors(
       console.log(`  Preview: ${doc.text.substring(0, 100)}...`);
     });
 
-    // Filter by minimum similarity if specified
     const filteredDocs =
       minSimilarity > 0
         ? documentsWithScores.filter(
@@ -278,7 +268,6 @@ function calculateCosineSimilarity(vecA: number[], vecB: number[]): number {
     magB += vecB[i] * vecB[i];
   }
 
-  // Prevent division by zero
   const magnitudeProduct = Math.sqrt(magA) * Math.sqrt(magB);
   if (magnitudeProduct === 0) return 0;
 

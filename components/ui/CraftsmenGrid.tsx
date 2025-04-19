@@ -1,4 +1,3 @@
-// components/CraftsmenGrid.tsx
 import React from "react";
 import { CraftsmanCard } from "./CraftsmanCard";
 

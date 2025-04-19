@@ -1,10 +1,9 @@
 import axios from "axios";
 import dotenv from "dotenv";
-dotenv.config({path: "./.env"});
+dotenv.config({ path: "./.env" });
 
 const { SENTENCE_TRANSFORMER_API_URL } = process.env;
 
-// Default model configuration
 const DEFAULT_MODEL = "Xenova/all-MiniLM-L6-v2";
 const EMBEDDING_DIMENSION = 384;
 
@@ -31,14 +30,12 @@ export async function generateSentenceEmbedding(
   options: EmbeddingOptions = {}
 ): Promise<EmbeddingResult> {
   try {
-    // Validate input
     if (!text || typeof text !== "string") {
       throw new Error("Text must be a non-empty string");
     }
 
     const { model = DEFAULT_MODEL, normalize = true } = options;
 
-    // Ensure the URL includes the /embed endpoint
     const response = await axios.post(`${SENTENCE_TRANSFORMER_API_URL}/embed`, {
       text,
       model: model,
@@ -73,14 +70,12 @@ export async function batchGenerateSentenceEmbeddings(
   options: EmbeddingOptions = {}
 ): Promise<EmbeddingResult[]> {
   try {
-    // Validate input
     if (!texts || !Array.isArray(texts) || texts.length === 0) {
       throw new Error("Texts must be a non-empty array of strings");
     }
 
     const { model = DEFAULT_MODEL, normalize = true } = options;
 
-    // API call to your sentence-transformer service
     const response = await axios.post(
       process.env.SENTENCE_TRANSFORMER_API_URL ||
         "http://localhost:8000/embed-batch",

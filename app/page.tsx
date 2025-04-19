@@ -1,4 +1,3 @@
-// Filename: app/chat/page.tsx
 "use client";
 
 import { Message } from "@ai-sdk/react";
@@ -16,10 +15,8 @@ import {
 } from "@/lib/extract-craftsman-data";
 import Image from "next/image";
 
-// Define the API endpoint
 const api = "/api/chat";
 
-// Define the Craftsman type
 interface Craftsman {
   id: string;
   name: string;
@@ -34,7 +31,6 @@ interface Craftsman {
   activeJobs?: number;
 }
 
-// Props type for the code component
 interface CodeProps {
   node: any;
   inline?: boolean;
@@ -43,7 +39,6 @@ interface CodeProps {
   [key: string]: any;
 }
 
-// Code component for Syntax Highlighting
 const CodeBlock: React.FC<CodeProps> = ({
   node,
   inline,
@@ -68,28 +63,23 @@ const CodeBlock: React.FC<CodeProps> = ({
   );
 };
 
-// Default text constant for comparison
 const DEFAULT_IMAGE_TEXT = "ايه المشكلة في الصورة هنا؟";
 
 export default function Chat() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  // Local state for user and assistant messages
   const [userMessages, setUserMessages] = useState<Message[]>([]);
   const [assistantMessages, setAssistantMessages] = useState<Message[]>([]);
-  // Combine user and assistant messages for rendering
   const allMessages = [...userMessages, ...assistantMessages].sort(
     (a, b) =>
       new Date(a.createdAt ?? Date.now()).getTime() -
       new Date(b.createdAt ?? Date.now()).getTime()
   );
 
-  // State for image upload
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // State for extracted card data and processing
   const [extractedCardData, setExtractedCardData] = useState<
     Record<string, Craftsman[]>
   >({});
@@ -101,7 +91,6 @@ export default function Chat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
 
-  // --- Basic useEffects (Mobile, Resize, Scroll) ---
   useEffect(() => {
     const checkIfMobile = () => setIsMobile(window.innerWidth < 768);
     checkIfMobile();
@@ -125,12 +114,10 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [allMessages, processingMessageIds]);
 
-  // Log messages for debugging
   useEffect(() => {
     console.log("All messages:", allMessages);
   }, [allMessages]);
 
-  // --- Effect for Data Extraction ---
   useEffect(() => {
     const lastMessage = allMessages[allMessages.length - 1];
     const messageId = lastMessage?.id;
@@ -174,7 +161,6 @@ export default function Chat() {
     }
   }, [allMessages, isLoading, extractedCardData, processingMessageIds]);
 
-  // --- Image Upload Handlers ---
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     console.log("Selected file:", file);
@@ -206,7 +192,12 @@ export default function Chat() {
 
   const handleCustomSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Submitting form, selectedImage:", selectedImage, "input:", input);
+    console.log(
+      "Submitting form, selectedImage:",
+      selectedImage,
+      "input:",
+      input
+    );
     if (!input.trim() && !selectedImage) {
       console.log("No input or image provided, submission aborted");
       return;
@@ -241,7 +232,6 @@ export default function Chat() {
 
     console.log("Submitting message content:", JSON.stringify(messageContent));
 
-    // Add user message to local state
     const newMessage: Message = {
       id: Date.now().toString(),
       role: "user",
@@ -250,7 +240,6 @@ export default function Chat() {
     };
     setUserMessages((prev) => [...prev, newMessage]);
 
-    // Send to backend via custom fetch
     try {
       const response = await fetch(api, {
         method: "POST",
@@ -260,10 +249,12 @@ export default function Chat() {
         }),
       });
       console.log("Response status:", response.status, response.statusText);
-      const responseText = await response.text(); // Get raw response
+      const responseText = await response.text();
       console.log("Raw response:", responseText);
       if (!response.ok) {
-        throw new Error(`Backend error: ${response.statusText}, Response: ${responseText}`);
+        throw new Error(
+          `Backend error: ${response.statusText}, Response: ${responseText}`
+        );
       }
       let result;
       try {
@@ -274,7 +265,6 @@ export default function Chat() {
       }
       console.log("Backend response:", result);
 
-      // Add assistant response to local state
       if (result && result.role === "assistant") {
         setAssistantMessages((prev) => [...prev, result]);
       } else {
@@ -282,7 +272,9 @@ export default function Chat() {
       }
     } catch (error) {
       console.error("Error sending message to backend:", error);
-      alert("حدث خطأ أثناء إرسال الرسالة: " + (error.message || "خطأ غير معروف"));
+      alert(
+        "حدث خطأ أثناء إرسال الرسالة: " + (error.message || "خطأ غير معروف")
+      );
     }
 
     setIsLoading(false);
@@ -303,17 +295,18 @@ export default function Chat() {
     <div
       className="flex flex-col h-screen font-inter"
       style={{
-        backgroundColor: "#F5F5F5", // Light gray background inspired by the logo's patterned backdrop
-        backgroundImage: "linear-gradient(135deg, rgba(196, 57, 43, 0.1) 0%, rgba(244, 208, 63, 0.1) 100%)", // Subtle gradient with red and beige
+        backgroundColor: "#F5F5F5",
+        backgroundImage:
+          "linear-gradient(135deg, rgba(196, 57, 43, 0.1) 0%, rgba(244, 208, 63, 0.1) 100%)",
       }}
     >
       {/* Header */}
       <header
         className="p-4 border-b shadow-sm"
         style={{
-          backgroundColor: "#C0392B", // Red background to match the logo's circle
-          color: "#FFFFFF", // White text for contrast
-          borderBottomColor: "#8D5524", // Brown border inspired by the tools
+          backgroundColor: "#C0392B",
+          color: "#FFFFFF",
+          borderBottomColor: "#8D5524",
         }}
       >
         <div className="max-w-3xl mx-auto flex items-center justify-center">
@@ -325,10 +318,7 @@ export default function Chat() {
                 width={100}
                 height={100}
               />
-              <p
-                className="font-rubik text-3xl"
-                style={{ color: "#F4D03F" }} // Beige text to match the hard hat
-              >
+              <p className="font-rubik text-3xl" style={{ color: "#F4D03F" }}>
                 مساعد حرفي
               </p>
             </div>
@@ -341,19 +331,16 @@ export default function Chat() {
         <div className="max-w-3xl mx-auto space-y-6">
           {allMessages.length === 0 && !isLoading && (
             <div className="flex flex-col items-center justify-center h-full py-16">
-              <Hammer
-                className="h-8 w-8 mb-4"
-                style={{ color: "#8D5524" }} // Brown icon to match the tools
-              />
+              <Hammer className="h-8 w-8 mb-4" style={{ color: "#8D5524" }} />
               <div
                 className="text-lg font-medium font-rubik"
-                style={{ color: "#C0392B" }} // Red text
+                style={{ color: "#C0392B" }}
               >
                 كيف يمكنني مساعدتك في خدمات حرفي اليوم؟
               </div>
               <div
                 className="mt-2 text-sm text-center max-w-md font-rubik"
-                style={{ color: "#8D5524" }} // Brown text for secondary info
+                style={{ color: "#8D5524" }}
               >
                 اسألني عن المشكلة التي تواجهك، أو اطلب التواصل مع حرفي مختص.
               </div>
@@ -369,18 +356,16 @@ export default function Chat() {
             >
               <div
                 className={`rounded-2xl px-4 py-3 max-w-[85%] shadow-sm relative ${
-                  message.role === "user"
-                    ? "text-black" // Black text for readability on beige
-                    : "bg-white border" // White background for assistant messages
+                  message.role === "user" ? "text-black" : "bg-white border"
                 }`}
                 style={
                   message.role === "user"
                     ? {
-                        backgroundColor: "#F4D03F", // Beige background for user messages
-                        borderColor: "#C0392B", // Red border
+                        backgroundColor: "#F4D03F",
+                        borderColor: "#C0392B",
                       }
                     : {
-                        borderColor: "#C0392B", // Red border for assistant messages
+                        borderColor: "#C0392B",
                       }
                 }
               >
@@ -389,20 +374,22 @@ export default function Chat() {
                     <div
                       className="h-8 w-8 p-1.5 shrink-0 rounded-full flex items-center justify-center"
                       style={{
-                        backgroundColor: "#F4D03F", // Beige background for the icon circle
-                        color: "#C0392B", // Red icon
+                        backgroundColor: "#F4D03F",
+                        color: "#C0392B",
                       }}
                     >
-                      <Hammer className="w-5 h-5" /> {/* Changed to Hammer icon */}
+                      <Hammer className="w-5 h-5" />{" "}
+                      {/* Changed to Hammer icon */}
                     </div>
                     <div className="min-w-0 flex-1">
                       {processingMessageIds.has(message.id) ||
                       (isLoading &&
-                        allMessages[allMessages.length - 1]?.id === message.id &&
+                        allMessages[allMessages.length - 1]?.id ===
+                          message.id &&
                         !extractedCardData[message.id]) ? (
                         <div
                           className="flex items-center gap-2 text-sm h-6"
-                          style={{ color: "#8D5524" }} // Brown text for loading
+                          style={{ color: "#8D5524" }}
                         >
                           <Loader2 className="w-4 h-4 animate-spin" />
                           <span>
@@ -435,7 +422,7 @@ export default function Chat() {
                                 return intro ? (
                                   <div
                                     className="prose prose-sm max-w-none mb-2 font-rubik"
-                                    style={{ color: "#8D5524" }} // Brown text
+                                    style={{ color: "#8D5524" }}
                                   >
                                     <ReactMarkdown
                                       components={{ code: CodeBlock }}
@@ -449,7 +436,7 @@ export default function Chat() {
                           ) : (
                             <div
                               className="prose prose-sm max-w-none font-rubik"
-                              style={{ color: "#8D5524" }} // Brown text for assistant messages
+                              style={{ color: "#8D5524" }}
                             >
                               {Array.isArray(message.content) ? (
                                 message.content.map((part, i) =>
@@ -490,11 +477,10 @@ export default function Chat() {
                 ) : (
                   <div
                     className="prose prose-sm max-w-none font-rubik"
-                    style={{ color: "#000000" }} // Black text for user messages
+                    style={{ color: "#000000" }}
                   >
                     {Array.isArray(message.content) ? (
                       message.content.map((part: any, i: number) => {
-                        // If this part is an image, always render it
                         if (part.type === "image") {
                           return (
                             <img
@@ -505,11 +491,11 @@ export default function Chat() {
                             />
                           );
                         }
-                        // If this part is text, render it only if it's not the default text
                         if (part.type === "text") {
-                          const isDefaultText = part.text === DEFAULT_IMAGE_TEXT;
+                          const isDefaultText =
+                            part.text === DEFAULT_IMAGE_TEXT;
                           if (isDefaultText) {
-                            return null; // Skip rendering the default text
+                            return null;
                           }
                           return (
                             <ReactMarkdown key={`${message.id}-part-${i}`}>
@@ -528,7 +514,7 @@ export default function Chat() {
                 <div
                   className="text-xs mt-1 opacity-70 text-right font-rubik"
                   style={{
-                    color: message.role === "user" ? "#C0392B" : "#C0392B", // Red timestamp
+                    color: message.role === "user" ? "#C0392B" : "#C0392B",
                   }}
                 >
                   {new Date(message.createdAt ?? Date.now()).toLocaleTimeString(
@@ -551,18 +537,18 @@ export default function Chat() {
       <footer
         className="p-4 pb-6 border-t"
         style={{
-          backgroundColor: "#FFFFFF", // White background for footer
-          borderTopColor: "#C0392B", // Red border
+          backgroundColor: "#FFFFFF",
+          borderTopColor: "#C0392B",
         }}
       >
         <form
           onSubmit={handleCustomSubmit}
           className="max-w-3xl mx-auto flex items-end gap-2 p-2 rounded-xl shadow-sm focus-within:ring-2"
           style={{
-            borderColor: "#C0392B", // Red border
-            backgroundColor: "#FFFFFF", // White background
+            borderColor: "#C0392B",
+            backgroundColor: "#FFFFFF",
             focusWithin: {
-              ringColor: "#F4D03F", // Beige ring on focus
+              ringColor: "#F4D03F",
             },
           }}
         >
@@ -585,8 +571,8 @@ export default function Chat() {
                   }}
                   className="mt-1 font-rubik"
                   style={{
-                    backgroundColor: "#C0392B", // Red button
-                    color: "#FFFFFF", // White text
+                    backgroundColor: "#C0392B",
+                    color: "#FFFFFF",
                   }}
                 >
                   إزالة الصورة
@@ -601,8 +587,8 @@ export default function Chat() {
                 onClick={() => fileInputRef.current?.click()}
                 className="h-10 w-10 shrink-0"
                 style={{
-                  borderColor: "#C0392B", // Red border
-                  color: "#C0392B", // Red icon
+                  borderColor: "#C0392B",
+                  color: "#C0392B",
                 }}
               >
                 <ImageIcon className="h-4 w-4" />
@@ -626,8 +612,8 @@ export default function Chat() {
                   maxHeight: isMobile ? "150px" : "200px",
                   overflowY: "auto",
                   backgroundColor: "transparent",
-                  color: "#8D5524", // Brown text
-                  placeholderColor: "#C0392B", // Red placeholder
+                  color: "#8D5524",
+                  placeholderColor: "#C0392B",
                 }}
               />
               <Button
@@ -636,8 +622,8 @@ export default function Chat() {
                 className="h-10 w-10 rounded-full cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed font-rubik"
                 disabled={(!input.trim() && !selectedImage) || isLoading}
                 style={{
-                  backgroundColor: "#C0392B", // Red button
-                  color: "#FFFFFF", // White icon
+                  backgroundColor: "#C0392B",
+                  color: "#FFFFFF",
                 }}
               >
                 {isLoading ? (
@@ -651,7 +637,7 @@ export default function Chat() {
         </form>
         <div
           className="max-w-3xl mx-auto text-xs mt-2 text-center font-rubik"
-          style={{ color: "#8D5524" }} // Brown text for footer note
+          style={{ color: "#8D5524" }}
         >
           الردود تعتمد على معلومات منصة حرفي. يرجى التحقق دائمًا من التفاصيل
           المهمة.

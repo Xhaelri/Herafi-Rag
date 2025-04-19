@@ -1,4 +1,3 @@
-// components/CraftsmanCard.tsx
 import React from "react";
 import { Star } from "lucide-react";
 
@@ -23,7 +22,6 @@ export const CraftsmanCard: React.FC<CraftsmanProps> = ({
   description = "",
   status = "free",
 }) => {
-  // Format description to be shorter if too long
   const shortDescription = description
     ? description.length > 100
       ? description.substring(0, 100) + "..."
@@ -39,8 +37,12 @@ export const CraftsmanCard: React.FC<CraftsmanProps> = ({
               {name.charAt(0)}
             </div>
             <div>
-              <h3 className="font-medium text-slate-900 dark:text-slate-100">{name}</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400">{craft}</p>
+              <h3 className="font-medium text-slate-900 dark:text-slate-100">
+                {name}
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {craft}
+              </p>
             </div>
           </div>
           <div className="flex items-center">
@@ -62,7 +64,9 @@ export const CraftsmanCard: React.FC<CraftsmanProps> = ({
               {address}
             </p>
           )}
-          <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">{shortDescription}</p>
+          <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">
+            {shortDescription}
+          </p>
         </div>
 
         <div className="mt-4 flex items-center justify-between">
