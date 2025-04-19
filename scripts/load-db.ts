@@ -13,11 +13,11 @@ const {
   ASTRA_DB_API_ENDPOINT,
   ASTRA_DB_APPLICATION_TOKEN,
   SENTENCE_TRANSFORMER_API_URL,
+  CRAFTSMEN_API_TOKEN
 } = process.env;
 
 // Craftsmen API configuration
 const CRAFTSMEN_API_URL = "http://20.199.86.3/api/client/search";
-const CRAFTSMEN_API_TOKEN = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vMjAuMTk5Ljg2LjMvYXBpL2NsaWVudC9sb2dpbiIsImlhdCI6MTc0NDc5MTI2OSwiZXhwIjoxNzYyNzkxMjY5LCJuYmYiOjE3NDQ3OTEyNjksImp0aSI6IkVRNjJHNzBtTktxWm5HUEQiLCJzdWIiOiIyMSIsInBydiI6IjQxZWZiN2JhZDdmNmY2MzJlMjQwNWJkM2E3OTNiOGE2YmRlYzY3NzcifQ.fvc0R4trbNB4A8gthDOURzPeoJ1ZSQc3FNdiPe-I-O4";
 
 // List of crafts to fetch - customize this list based on your needs
 const craftsToFetch = [
