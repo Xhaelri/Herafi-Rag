@@ -1,7 +1,7 @@
 "use client";
 
 import { Message } from "@ai-sdk/react";
-import { ArrowUp, Hammer, Loader2, Image as ImageIcon } from "lucide-react";
+import { ArrowUp, Hammer, Loader2, Image as ImageIcon, User } from "lucide-react"; // Added User icon
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useEffect, useRef, useState } from "react";
@@ -29,6 +29,7 @@ interface Craftsman {
   cities?: string;
   completedJobs?: number;
   activeJobs?: number;
+  image?: string | null;
 }
 
 interface CodeProps {
@@ -203,6 +204,12 @@ export default function Chat() {
       return;
     }
 
+    // Clear the input field and image preview immediately after submission
+    setInput("");
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
     setIsLoading(true);
 
     let messageContent: Message["content"];
@@ -278,10 +285,6 @@ export default function Chat() {
     }
 
     setIsLoading(false);
-    setSelectedImage(null);
-    setImagePreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    setInput("");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -315,10 +318,10 @@ export default function Chat() {
               <Image
                 src={"/logo.png"}
                 alt="شعار حرفي"
-                width={100}
-                height={100}
+                width={50}
+                height={50}
               />
-              <p className="font-rubik text-3xl" style={{ color: "#F4D03F" }}>
+              <p className="font-rubik text-2xl" style={{ color: "#fff" }}>
                 مساعد حرفي
               </p>
             </div>
@@ -356,12 +359,11 @@ export default function Chat() {
             >
               <div
                 className={`rounded-2xl px-4 py-3 max-w-[85%] shadow-sm relative ${
-                  message.role === "user" ? "text-black" : "bg-white border"
+                  message.role === "user" ? "bg-white border" : "bg-white border"
                 }`}
                 style={
                   message.role === "user"
                     ? {
-                        backgroundColor: "#F4D03F",
                         borderColor: "#C0392B",
                       }
                     : {
@@ -374,7 +376,7 @@ export default function Chat() {
                     <div
                       className="h-8 w-8 p-1.5 shrink-0 rounded-full flex items-center justify-center"
                       style={{
-                        backgroundColor: "#F4D03F",
+                        backgroundColor: "#FFEFA9",
                         color: "#C0392B",
                       }}
                     >
@@ -475,39 +477,52 @@ export default function Chat() {
                     </div>
                   </div>
                 ) : (
-                  <div
-                    className="prose prose-sm max-w-none font-rubik"
-                    style={{ color: "#000000" }}
-                  >
-                    {Array.isArray(message.content) ? (
-                      message.content.map((part: any, i: number) => {
-                        if (part.type === "image") {
-                          return (
-                            <img
-                              key={`${message.id}-part-${i}`}
-                              src={part.image}
-                              alt="User uploaded image"
-                              className="max-w-[200px] rounded-lg mt-2"
-                            />
-                          );
-                        }
-                        if (part.type === "text") {
-                          const isDefaultText =
-                            part.text === DEFAULT_IMAGE_TEXT;
-                          if (isDefaultText) {
+                  <div className="flex gap-2 items-start">
+                    <div className="min-w-0 flex-1">
+                      <div
+                        className="prose prose-sm max-w-none font-rubik"
+                        style={{ color: "#8D5524" }}
+                      >
+                        {Array.isArray(message.content) ? (
+                          message.content.map((part: any, i: number) => {
+                            if (part.type === "image") {
+                              return (
+                                <img
+                                  key={`${message.id}-part-${i}`}
+                                  src={part.image}
+                                  alt="User uploaded image"
+                                  className="max-w-[200px] rounded-lg mt-2"
+                                />
+                              );
+                            }
+                            if (part.type === "text") {
+                              const isDefaultText =
+                                part.text === DEFAULT_IMAGE_TEXT;
+                              if (isDefaultText) {
+                                return null;
+                              }
+                              return (
+                                <ReactMarkdown key={`${message.id}-part-${i}`}>
+                                  {part.text}
+                                </ReactMarkdown>
+                              );
+                            }
                             return null;
-                          }
-                          return (
-                            <ReactMarkdown key={`${message.id}-part-${i}`}>
-                              {part.text}
-                            </ReactMarkdown>
-                          );
-                        }
-                        return null;
-                      })
-                    ) : (
-                      <ReactMarkdown>{message.content}</ReactMarkdown>
-                    )}
+                          })
+                        ) : (
+                          <ReactMarkdown>{message.content}</ReactMarkdown>
+                        )}
+                      </div>
+                    </div>
+                    <div
+                      className="h-8 w-8 p-1.5 shrink-0 rounded-full flex items-center justify-center"
+                      style={{
+                        backgroundColor: "#FFEFA9",
+                        color: "#C0392B",
+                      }}
+                    >
+                      <User className="w-5 h-5" />
+                    </div>
                   </div>
                 )}
 
@@ -535,7 +550,7 @@ export default function Chat() {
 
       {/* Input Area */}
       <footer
-        className="p-4 pb-6 border-t"
+        className="p-4  border-t"
         style={{
           backgroundColor: "#FFFFFF",
           borderTopColor: "#C0392B",
@@ -543,16 +558,13 @@ export default function Chat() {
       >
         <form
           onSubmit={handleCustomSubmit}
-          className="max-w-3xl mx-auto flex items-end gap-2 p-2 rounded-xl shadow-sm focus-within:ring-2"
+          className="max-w-3xl mx-auto flex items-end gap-2 border p-2 rounded-xl shadow-sm "
           style={{
             borderColor: "#C0392B",
             backgroundColor: "#FFFFFF",
-            focusWithin: {
-              ringColor: "#F4D03F",
-            },
           }}
         >
-          <div className="flex flex-col w-full">
+          <div className="flex flex-col w-full ">
             {imagePreview && (
               <div className="mb-2">
                 <img
@@ -579,7 +591,7 @@ export default function Chat() {
                 </Button>
               </div>
             )}
-            <div className="flex items-end gap-2">
+            <div className="flex items-end gap-2 ">
               <Button
                 type="button"
                 size="icon"

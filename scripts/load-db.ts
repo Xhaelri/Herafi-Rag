@@ -157,45 +157,6 @@ async function fetchCraftsmenData(craft: string, page: number = 1) {
   }
 }
 
-/*
-async function fetchCraftsmenData(craft: string, page: number = 1) {
-  try {
-    console.log(`Fetching ${craft} craftsmen data, page ${page}...`);
-    
-    const response = await axios.get(
-      CRAFTSMEN_API_URL, 
-      {
-        params: {
-          pagination: 100,
-          page,
-          craft
-        },
-        headers: {
-          'Authorization': CRAFTSMEN_API_TOKEN,
-          'Accept': 'application/json'
-        }
-      }
-    );
-    
-    if (response.data && response.data.status === true) {
-      console.log(`Successfully fetched ${response.data.data.data.length} ${craft} craftsmen from page ${page}`);
-      return response.data.data;
-    } else {
-      console.error(`Error fetching ${craft} craftsmen:`, response.data);
-      return null;
-    }
-  } catch (error) {
-    console.error(`API error for ${craft}:`, error.message);
-    if (error.response) {
-      console.error('Response data:', error.response.data);
-      console.error('Response status:', error.response.status);
-      console.error('Response headers:', error.response.headers);
-    }
-    return null;
-  }
-}
-*/
-
 function formatCraftsmanData(craftsman) {
   let formattedText = `اسم الحرفي: ${craftsman.name}\n`;
   formattedText += `المهنة: ${craftsman.craft?.name || "غير محدد"}\n`;
@@ -225,6 +186,11 @@ function formatCraftsmanData(craftsman) {
   formattedText += `الحالة: ${
     craftsman.status === "free" ? "متاح" : "مشغول"
   }\n`;
+
+  // Add image URL if available
+  if (craftsman.image) {
+    formattedText += `رابط الصورة: ${craftsman.image}\n`;
+  }
 
   return formattedText;
 }
@@ -285,6 +251,7 @@ export const loadSampleData = async () => {
                 ...(craftsman.cities?.map((c) => c.city) || []),
               ],
               timestamp: new Date().toISOString(),
+              image: craftsman.image || null, // Store image URL as a separate field
               rawData: craftsman,
             });
 
@@ -336,6 +303,7 @@ async function debugDbContents() {
         craft: sample.craft || "No craft",
         cities: sample.cities || "No cities",
         keywords: sample.keywords || "No keywords",
+        image: sample.image || "No image",
         vector_length: sample.$vector
           ? sample.$vector.length
           : "No vector found",

@@ -10,6 +10,7 @@ interface Craftsman {
   cities?: string;
   completedJobs?: number;
   activeJobs?: number;
+  image?: string | null; // Add image field
 }
 
 /**
@@ -49,6 +50,7 @@ export function extractCraftsmanData(text: string): Craftsman[] {
         { key: "activeJobsText", label: "الوظائف النشطة:" },
         { key: "description", label: "الوصف:" },
         { key: "statusText", label: "الحالة:" },
+        { key: "image", label: "رابط الصورة:" }, // Add image field extraction
         { key: "sourceId", label: "sourceId:" },
       ];
 
@@ -170,6 +172,7 @@ export function extractCraftsmanData(text: string): Craftsman[] {
           ? completedJobs
           : undefined,
         activeJobs: !isNaN(activeJobs as number) ? activeJobs : undefined,
+        image: extractedRawData.image || null, // Add extracted image field
       });
     } catch (error) {
       console.error(

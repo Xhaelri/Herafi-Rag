@@ -10,6 +10,7 @@ interface Craftsman {
   address?: string;
   description?: string;
   status?: string;
+  image?: string; // Already includes image prop
 }
 
 interface CraftsmenGridProps {
@@ -24,10 +25,10 @@ export const CraftsmenGrid: React.FC<CraftsmenGridProps> = ({ craftsmen }) => {
   }, [craftsmen]);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
-      {displayedCraftsmen.map((craftsman, index) => (
-        <CraftsmanCard key={index} {...craftsman} />
-      ))}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-4">
+        {displayedCraftsmen.map((craftsman) => (
+          <CraftsmanCard key={craftsman.id} {...craftsman} />
+        ))}
     </div>
   );
 };
