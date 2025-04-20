@@ -82,6 +82,7 @@ export async function POST(req: Request) {
         );
         docContext = "لم يتم العثور على مستندات في قاعدة المعرفة.";
       } else {
+        
         const cursor = collection.find(null, {
           sort: { $vector: embeddingVector },
           limit: 15,

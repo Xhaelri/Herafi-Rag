@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { CraftsmanCard } from "./CraftsmanCard";
 
 interface Craftsman {
@@ -17,14 +17,16 @@ interface CraftsmenGridProps {
 }
 
 export const CraftsmenGrid: React.FC<CraftsmenGridProps> = ({ craftsmen }) => {
-  if (!craftsmen || craftsmen.length === 0) {
-    return null;
-  }
+  const displayedCraftsmen = useMemo(() => {
+    return [...craftsmen]
+      .sort((a, b) => (b.rating || 0) - (a.rating || 0)) // Sort by rating, highest first
+      .slice(0, 4); // Limit to 4 craftsmen
+  }, [craftsmen]);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-4">
-      {craftsmen.map((craftsman) => (
-        <CraftsmanCard key={craftsman.id} {...craftsman} />
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+      {displayedCraftsmen.map((craftsman, index) => (
+        <CraftsmanCard key={index} {...craftsman} />
       ))}
     </div>
   );
