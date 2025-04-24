@@ -36,9 +36,9 @@ export const CraftsmanCard: React.FC<CraftsmanProps> = ({
   const hasValidImage = image && image.trim() !== "" && !imageFailed;
 
   return (
-    <div className="bg-white flex flex-col justify-between p-4 border border-[#C0392B] rounded-2xl shadow-md hover:shadow-md transition-all duration-300 transform hover:-translate-y-1">
+    <div className="bg-white flex flex-col justify-between p-4 border border-[#C0392B] rounded-2xl shadow-md hover:shadow-md transition-all duration-300 transform hover:-translate-y-1" >
         <div className="flex items-start justify-between ">
-          <div className="flex items-center space-x-4 rtl:space-x-reverse">
+          <div className="flex items-center space-x-4 ">
             {hasValidImage ? (
               <img
                 src={`http://20.199.86.3/api/img/${image}`}
