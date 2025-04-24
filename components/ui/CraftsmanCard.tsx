@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Star } from "lucide-react";
 
 interface CraftsmanProps {
@@ -10,7 +10,7 @@ interface CraftsmanProps {
   address?: string;
   description?: string;
   status?: string;
-  image?: string | null; // Added image prop
+  image?: string | null;
 }
 
 export const CraftsmanCard: React.FC<CraftsmanProps> = ({
@@ -22,28 +22,33 @@ export const CraftsmanCard: React.FC<CraftsmanProps> = ({
   address = "",
   description = "",
   status = "free",
-  image = null, // Added image prop with default value
+  image = null,
 }) => {
+  const [imageFailed, setImageFailed] = useState(false); // State to track image load failure
+
   const shortDescription = description
     ? description.length > 100
       ? description.substring(0, 100) + "..."
       : description
     : "لا يوجد وصف متاح";
 
+  // Check if image is valid (not null, not undefined, not empty string)
+  const hasValidImage = image && image.trim() !== "" && !imageFailed;
+
   return (
-    <div className="bg-[#ffffff] border border-[#C0392B] rounded-2xl shadow-md hover:shadow-md transition-all duration-300 transform hover:-translate-y-1">
-      <div className="p-3">
+    <div className="bg-white flex flex-col justify-between p-4 border border-[#C0392B] rounded-2xl shadow-md hover:shadow-md transition-all duration-300 transform hover:-translate-y-1">
         <div className="flex items-start justify-between ">
-          <div className="flex items-center  space-x-4 rtl:space-x-reverse">
-            {image ? ( // Added conditional rendering for image
+          <div className="flex items-center space-x-4 rtl:space-x-reverse">
+            {hasValidImage ? (
               <img
-                src={image}
+                src={`http://20.199.86.3/api/img/${image}`}
                 alt={`صورة ${name}`}
                 className="w-12 h-12 rounded-full object-cover border border-[#C0392B]"
+                onError={() => setImageFailed(true)} // Set failure state if image fails to load
               />
             ) : (
               <div className="w-12 h-12 rounded-full bg-[#F4D03F] flex items-center justify-center text-[#C0392B] text-xl font-aboreto">
-                {name.charAt(0)}
+                {name.charAt(0) || "?"}
               </div>
             )}
             <div>
@@ -70,11 +75,11 @@ export const CraftsmanCard: React.FC<CraftsmanProps> = ({
 
         <div className="mt-4">
           {address && (
-            <p className="text-xs font-inter text-[#8D5524] mb-2">
+            <p className="text-xs font-inter text-[#8D5524] mb-2" dir="rtl">
               {address}
             </p>
           )}
-          <p className="text-sm font-inter text-[#8D5524] leading-relaxed">
+          <p className="text-sm font-inter text-[#8D5524] leading-relaxed"  dir="rtl">
             {shortDescription}
           </p>
         </div>
@@ -101,7 +106,6 @@ export const CraftsmanCard: React.FC<CraftsmanProps> = ({
             عرض الملف
           </a>
         </div>
-      </div>
     </div>
   );
 };
