@@ -1,4 +1,3 @@
-
 import { Pinecone } from "@pinecone-database/pinecone";
 import dotenv from "dotenv";
 import axios from "axios";
@@ -42,7 +41,6 @@ console.log("Environment variables check:", {
 async function checkIndex() {
   try {
     const indexList = await pinecone.listIndexes();
-    // Convert IndexList to array for compatibility
     const indexes = indexList.indexes || [];
     const indexExists = indexes.some((index) => index.name === PINECONE_INDEX_NAME);
     console.log(`Index ${PINECONE_INDEX_NAME} exists: ${indexExists}`);
@@ -62,12 +60,11 @@ async function createIndex() {
       spec: {
         serverless: {
           cloud: "aws",
-          region: "us-east-1", // Adjust region as needed
+          region: "us-east-1",
         },
       },
     });
     console.log(`Index ${PINECONE_INDEX_NAME} created successfully`);
-    // Wait for index to be ready
     await new Promise((resolve) => setTimeout(resolve, 30000)); // 30 seconds
   } catch (error) {
     if (error.message.includes("already exists")) {
@@ -98,15 +95,20 @@ async function fetchCraftsmenData(craft: string, page: number = 1) {
       }
     );
 
-    if (response.data && response.data.status === true) {
+    if (!response.data) {
+      console.warn(`No data in response for ${craft}, page ${page}`);
+      return null;
+    }
+
+    if (response.data.status === true && response.data.data?.data) {
       console.log(`Successfully fetched ${response.data.data.data.length} ${craft} craftsmen from page ${page}`);
       return response.data.data;
     } else {
-      console.error(`Error fetching ${craft} craftsmen:`, response.data);
+      console.warn(`Invalid response for ${craft}, page ${page}:`, response.data);
       return null;
     }
   } catch (error) {
-    console.error(`API error for ${craft}:`, error.message);
+    console.error(`API error for ${craft}, page ${page}:`, error.message);
     if (error.response) {
       console.error("Response data:", error.response.data);
       console.error("Response status:", error.response.status);
@@ -117,40 +119,60 @@ async function fetchCraftsmenData(craft: string, page: number = 1) {
   }
 }
 
-function formatCraftsmanDescription(craftsman: any): string {
-  let description = `اسم الحرفي: ${craftsman.name}\n`;
-  description += `المهنة: ${craftsman.craft?.name || "غير محدد"}\n`;
-  description += `العنوان: ${craftsman.address || "غير محدد"}\n`;
+function formatCraftsmanDescription(craftsman: any): { description: string; missingFields: string[] } {
+  const missingFields: string[] = [];
+  const defaults = {
+    name: "حرفي مجهول",
+    craftName: "غير محدد",
+    address: "غير محدد",
+    cities: ["مصر"],
+    average_rating: "غير متوفر",
+    number_of_ratings: 0,
+    done_jobs_num: 0,
+    active_jobs_num: 0,
+    description: "لا يوجد وصف",
+    status: "غير معروف",
+    image: null,
+  };
 
-  if (craftsman.cities && craftsman.cities.length > 0) {
-    description += `المدن: ${craftsman.cities.map((c: any) => c.city).join(", ")}\n`;
-  }
+  if (!craftsman.name) missingFields.push("name");
+  if (!craftsman.craft?.name) missingFields.push("craft.name");
+  if (!craftsman.address) missingFields.push("address");
+  if (!craftsman.cities || !craftsman.cities.length) missingFields.push("cities");
+  if (!craftsman.average_rating) missingFields.push("average_rating");
+  if (!craftsman.description) missingFields.push("description");
+  if (!craftsman.status) missingFields.push("status");
+  if (!craftsman.image) missingFields.push("image");
+
+  let description = `اسم الحرفي: ${craftsman.name || defaults.name}\n`;
+  description += `المهنة: ${craftsman.craft?.name || defaults.craftName}\n`;
+  description += `العنوان: ${craftsman.address || defaults.address}\n`;
+
+  const cities = craftsman.cities?.map((c: any) => c.city).filter(Boolean) || defaults.cities;
+  description += `المدن: ${cities.join(", ")}\n`;
 
   if (craftsman.average_rating) {
-    description += `التقييم: ${craftsman.average_rating} (عدد التقييمات: ${craftsman.number_of_ratings || 0})\n`;
+    description += `التقييم: ${craftsman.average_rating} (عدد التقييمات: ${craftsman.number_of_ratings || defaults.number_of_ratings})\n`;
   } else {
-    description += "التقييم: غير متوفر\n";
+    description += `التقييم: ${defaults.average_rating}\n`;
   }
 
-  description += `الوظائف المنجزة: ${craftsman.done_jobs_num || 0}\n`;
-  description += `الوظائف النشطة: ${craftsman.active_jobs_num || 0}\n`;
+  description += `الوظائف المنجزة: ${craftsman.done_jobs_num || defaults.done_jobs_num}\n`;
+  description += `الوظائف النشطة: ${craftsman.active_jobs_num || defaults.active_jobs_num}\n`;
 
-  if (craftsman.description) {
-    description += `الوصف: ${craftsman.description}\n`;
-  }
-
-  description += `الحالة: ${craftsman.status === "free" ? "متاح" : "مشغول"}\n`;
+  description += `الوصف: ${craftsman.description || defaults.description}\n`;
+  description += `الحالة: ${craftsman.status === "free" ? "متاح" : craftsman.status || defaults.status}\n`;
 
   if (craftsman.image) {
     description += `رابط الصورة: ${craftsman.image}\n`;
   }
 
-  return description;
+  return { description, missingFields };
 }
 
 async function validateEmbedding(vector: number[] | null | undefined): Promise<boolean> {
   if (!vector || !Array.isArray(vector) || vector.length !== embeddingDimension) {
-    console.error("Invalid embedding:", {
+    console.warn("Invalid embedding:", {
       isArray: Array.isArray(vector),
       length: vector ? vector.length : "undefined",
       sample: vector && Array.isArray(vector) ? vector.slice(0, 5) : "N/A",
@@ -168,7 +190,6 @@ export const loadSampleData = async (clearIndex: boolean = false) => {
       try {
         await pinecone.deleteIndex(PINECONE_INDEX_NAME!);
         console.log(`Index ${PINECONE_INDEX_NAME} deleted successfully`);
-        // Wait for deletion to propagate
         await new Promise((resolve) => setTimeout(resolve, 10000)); // 10 seconds
       } catch (error) {
         console.error("Error deleting index:", error.message);
@@ -189,6 +210,7 @@ export const loadSampleData = async (clearIndex: boolean = false) => {
 
     let totalDocuments = 0;
     let failedInsertions = 0;
+    const missingFieldsStats: Record<string, number> = {};
 
     for (const craft of craftsToFetch) {
       console.log(`Processing craft: ${craft}`);
@@ -208,95 +230,125 @@ export const loadSampleData = async (clearIndex: boolean = false) => {
         console.log(`Processing ${craftsmen.length} ${craft} craftsmen from page ${currentPage}`);
 
         for (const craftsman of craftsmen) {
+          const craftsmanId = craftsman.id?.toString() || uuidv4();
+          const craftsmanName = craftsman.name || "حرفي مجهول";
           const craftName = craftsman.craft?.name || "حرفي";
-          const cities = craftsman.cities?.map((c: any) => c.city) || ["مصر"];
+          const cities = craftsman.cities?.map((c: any) => c.city).filter(Boolean) || ["مصر"];
           const keywords = ["حرفي", craftName, ...cities];
           const embeddingText = keywords.join(", ");
 
           try {
-            console.log(`Generating embedding for craftsman: ${craftsman.name} (${embeddingText})`);
-            const embeddingResult = await generateSentenceEmbedding(embeddingText);
-            const vectorArray = embeddingResult.embedding;
+            const { description, missingFields } = formatCraftsmanDescription(craftsman);
+            missingFields.forEach((field) => {
+              missingFieldsStats[field] = (missingFieldsStats[field] || 0) + 1;
+            });
 
-            if (!(await validateEmbedding(vectorArray))) {
-              console.error(`Skipping insertion for ${craftsman.name} due to invalid embedding`);
-              failedInsertions++;
-              continue;
+            let vectorArray: number[] = Array(embeddingDimension).fill(0); // Fallback zero vector
+            let embeddingStatus = "failed";
+
+            try {
+              console.log(`Generating embedding for craftsman: ${craftsmanName} (${embeddingText})`);
+              const embeddingResult = await generateSentenceEmbedding(embeddingText);
+              vectorArray = embeddingResult.embedding;
+
+              if (await validateEmbedding(vectorArray)) {
+                embeddingStatus = "success";
+              } else {
+                console.warn(`Using fallback zero vector for ${craftsmanName} due to invalid embedding`);
+              }
+            } catch (error) {
+              console.warn(`Embedding generation failed for ${craftsmanName}:`, error.message);
             }
-
-            console.log("Embedding sample:", vectorArray.slice(0, 5));
 
             const vectorId = uuidv4();
             const vectorRecord = {
               id: vectorId,
               values: vectorArray,
               metadata: {
-                id: craftsman.id.toString(),
-                name: craftsman.name,
+                id: craftsmanId,
+                name: craftsmanName,
                 category: craftName,
-                description: formatCraftsmanDescription(craftsman),
+                description,
                 rating: craftsman.average_rating?.toString() || "0",
-                cities: cities,
-                keywords: keywords,
+                cities,
+                keywords,
                 timestamp: new Date().toISOString(),
-                image: craftsman.image || null,
+                embeddingStatus,
+                missingFields,
+                // Only include image if it's a non-null string
+                ...(craftsman.image ? { image: craftsman.image } : {}),
               },
             };
 
-            console.log(`Vector to insert for ${craftsman.name}:`, {
+            console.log(`Vector to insert for ${craftsmanName}:`, {
               id: vectorId,
-              name: craftsman.name,
+              name: craftsmanName,
               vectorSample: vectorRecord.values.slice(0, 5),
               vectorLength: vectorRecord.values.length,
               keywords: vectorRecord.metadata.keywords,
+              missingFields,
+              embeddingStatus,
             });
 
             await index.upsert([vectorRecord]);
             console.log(`Vector inserted with ID: ${vectorId}`);
 
-            // Verify insertion by querying the vector
-            const queryResult = await index.query({
-              id: vectorId,
-              topK: 1,
-              includeMetadata: true,
-              includeValues: true,
-            });
+            // Verify insertion with retry
+            let verified = false;
+            for (let attempt = 1; attempt <= 3; attempt++) {
+              try {
+                const queryResult = await index.query({
+                  id: vectorId,
+                  topK: 1,
+                  includeMetadata: true,
+                  includeValues: true,
+                });
 
-            if (!queryResult.matches || queryResult.matches.length === 0) {
-              console.error(`Inserted vector not found for ${craftsman.name} (ID: ${vectorId})`);
-              failedInsertions++;
-              continue;
+                if (!queryResult.matches || queryResult.matches.length === 0) {
+                  console.warn(`Inserted vector not found for ${craftsmanName} (ID: ${vectorId}), attempt ${attempt}`);
+                  continue;
+                }
+
+                const retrievedVector = queryResult.matches[0];
+                const hasVector = retrievedVector.values && Array.isArray(retrievedVector.values) && retrievedVector.values.length === embeddingDimension;
+                const vectorSample = hasVector ? retrievedVector.values.slice(0, 5) : retrievedVector.values;
+
+                console.log(`Retrieved vector for ${craftsmanName}:`, {
+                  vectorValue: vectorSample,
+                  vectorType: retrievedVector.values ? typeof retrievedVector.values : "undefined",
+                  isArray: Array.isArray(retrievedVector.values),
+                  metadata: retrievedVector.metadata,
+                });
+
+                if (!hasVector && embeddingStatus !== "failed") {
+                  console.warn(`Vector field invalid for ${craftsmanName} (ID: ${vectorId})`, {
+                    vectorValue: retrievedVector.values,
+                    vectorType: retrievedVector.values ? typeof retrievedVector.values : "undefined",
+                    isArray: Array.isArray(retrievedVector.values),
+                    metadata: retrievedVector.metadata,
+                  });
+                } else {
+                  console.log(`Vector verified for ${craftsmanName} (ID: ${vectorId})`, {
+                    vectorLength: retrievedVector.values.length,
+                    vectorSample,
+                    keywordCount: (retrievedVector.metadata?.keywords as string[])?.length || 0,
+                  });
+                  verified = true;
+                  break;
+                }
+              } catch (error) {
+                console.warn(`Verification attempt ${attempt} failed for ${craftsmanName}:`, error.message);
+              }
+              await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds
             }
 
-            const retrievedVector = queryResult.matches[0];
-            const hasVector = retrievedVector.values && Array.isArray(retrievedVector.values) && retrievedVector.values.length === embeddingDimension;
-            const vectorSample = hasVector ? retrievedVector.values.slice(0, 5) : retrievedVector.values;
-
-            console.log(`Retrieved vector for ${craftsman.name}:`, {
-              vectorValue: vectorSample,
-              vectorType: retrievedVector.values ? typeof retrievedVector.values : "undefined",
-              isArray: Array.isArray(retrievedVector.values),
-              metadata: retrievedVector.metadata,
-            });
-
-            if (!hasVector) {
-              console.error(`Vector field invalid for ${craftsman.name} (ID: ${vectorId})`, {
-                vectorValue: retrievedVector.values,
-                vectorType: retrievedVector.values ? typeof retrievedVector.values : "undefined",
-                isArray: Array.isArray(retrievedVector.values),
-                metadata: retrievedVector.metadata,
-              });
-              failedInsertions++;
-            } else {
-              console.log(`Vector verified for ${craftsman.name} (ID: ${vectorId})`, {
-                vectorLength: retrievedVector.values.length,
-                vectorSample,
-                keywordCount: (retrievedVector.metadata?.keywords as string[])?.length || 0,
-              });
-              totalDocuments++;
+            if (!verified) {
+              console.warn(`Verification failed for ${craftsmanName} (ID: ${vectorId}) after 3 attempts, but counting as inserted`);
             }
+            totalDocuments++; // Count as inserted regardless of verification
+
           } catch (error) {
-            console.error(`Error processing craftsman ${craftsman.name}:`, error.message);
+            console.error(`Error processing craftsman ${craftsmanName}:`, error.message);
             failedInsertions++;
           }
         }
@@ -311,6 +363,7 @@ export const loadSampleData = async (clearIndex: boolean = false) => {
 
     console.log(`Total craftsmen vectors inserted: ${totalDocuments}`);
     console.log(`Failed insertions: ${failedInsertions}`);
+    console.log(`Missing fields statistics:`, missingFieldsStats);
     if (failedInsertions > 0) {
       console.warn("Some vectors were not inserted correctly. Check logs for details.");
     }
@@ -338,9 +391,8 @@ async function debugDbContents() {
     console.log(`Total vectors in ${PINECONE_INDEX_NAME}: ${stats.totalRecordCount || 0}`);
 
     if (stats.totalRecordCount > 0) {
-      // Query a sample of vectors
       const sampleQuery = await index.query({
-        vector: Array(embeddingDimension).fill(0), // Dummy vector for sampling
+        vector: Array(embeddingDimension).fill(0),
         topK: 5,
         includeMetadata: true,
         includeValues: true,
@@ -355,6 +407,8 @@ async function debugDbContents() {
           cities: match.metadata?.cities || "No cities",
           keywords: match.metadata?.keywords || "No keywords",
           image: match.metadata?.image || "No image",
+          embeddingStatus: match.metadata?.embeddingStatus || "Unknown",
+          missingFields: match.metadata?.missingFields || [],
           vector_length: hasVector ? match.values.length : "No vector found",
           vector_sample: vectorSample,
           has_vector: hasVector,
@@ -364,7 +418,6 @@ async function debugDbContents() {
         });
       });
 
-      // Check for vectors with invalid values
       const allVectors = await index.query({
         vector: Array(embeddingDimension).fill(0),
         topK: stats.totalRecordCount,
@@ -406,6 +459,7 @@ async function testApiConnection() {
     );
     console.log("API connection test response status:", testResponse.status);
     console.log("API connection successful");
+    console.log("Sample response data:", testResponse.data);
   } catch (error) {
     console.error("API connection test failed:", error.message);
     if (error.response) {

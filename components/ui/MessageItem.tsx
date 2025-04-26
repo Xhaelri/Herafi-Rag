@@ -75,6 +75,7 @@ export default function MessageItem({
       
     >
       <div
+      
         className={`rounded-2xl px-4 py-3 max-w-[85%] shadow-sm relative ${
           message.role === "user" ? "bg-white border" : "bg-white border"
         }`}
@@ -109,7 +110,7 @@ export default function MessageItem({
                   dir="ltr"
                 >
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span >
+                  <span dir="rtl">
                     {isProcessing
                       ? "جاري تجهيز المعلومات..."
                       : "لحظة من فضلك..."}
@@ -197,6 +198,7 @@ export default function MessageItem({
               <div
                 className="prose prose-sm max-w-none font-rubik"
                 style={{ color: "#8D5524" }}
+                dir="rtl"
               >
                 {Array.isArray(message.content) ? (
                   message.content.map((part: any, i: number) => {
