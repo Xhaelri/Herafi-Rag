@@ -10,7 +10,8 @@ interface Craftsman {
   address?: string;
   description?: string;
   status?: string;
-  image?: string; // Already includes image prop
+  cities?: string;
+  image?: string; 
 }
 
 interface CraftsmenGridProps {
@@ -20,8 +21,8 @@ interface CraftsmenGridProps {
 export const CraftsmenGrid: React.FC<CraftsmenGridProps> = ({ craftsmen }) => {
   const displayedCraftsmen = useMemo(() => {
     return [...craftsmen]
-      .sort((a, b) => (b.rating || 0) - (a.rating || 0)) // Sort by rating, highest first
-      .slice(0, 4); // Limit to 4 craftsmen
+      // .sort((a, b) => (b.rating || 0) - (a.rating || 0)) // Sort by rating, highest first
+      // .slice(0, 4); // Limit to 4 craftsmen
   }, [craftsmen]);
 
   return (

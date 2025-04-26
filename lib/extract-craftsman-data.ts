@@ -1,3 +1,5 @@
+
+
 interface Craftsman {
   id: string;
   name: string;
@@ -11,6 +13,14 @@ interface Craftsman {
   completedJobs?: number;
   activeJobs?: number;
   image?: string | null; // Add image field
+}
+
+function normalizeArabicText(text: string): string {
+  return text
+    .replace(/[\u0617-\u061A\u064B-\u065F]/g, "") // Remove diacritics
+    .replace(/[\u0622\u0623\u0625]/g, "\u0627") // Normalize alef variants
+    .replace(/\s+/g, " ") // Normalize spaces
+    .trim();
 }
 
 /**
@@ -152,9 +162,16 @@ export function extractCraftsmanData(text: string): Craftsman[] {
         ? parseInt(activeJobsText, 10)
         : undefined;
 
+        let cities = extractedRawData.cities
+        ? extractedRawData.cities
+            .split(",")
+            .map((city) => normalizeArabicText(city.trim()))
+            .filter((city) => city)
+            .join(", ")
+        : undefined;
+
       const addressCombined = [
         extractedRawData.addressRaw,
-        extractedRawData.cities,
       ]
         .filter(Boolean)
         .join(", ");
@@ -167,7 +184,7 @@ export function extractCraftsmanData(text: string): Craftsman[] {
         reviewCount,
         description: extractedRawData.description || undefined,
         status,
-        cities: extractedRawData.cities || undefined,
+        cities,
         completedJobs: !isNaN(completedJobs as number)
           ? completedJobs
           : undefined,

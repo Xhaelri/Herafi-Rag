@@ -10,6 +10,7 @@ interface CraftsmanProps {
   address?: string;
   description?: string;
   status?: string;
+  cities?: string;
   image?: string | null;
 }
 
@@ -22,6 +23,7 @@ export const CraftsmanCard: React.FC<CraftsmanProps> = ({
   address = "",
   description = "",
   status = "free",
+  cities = [],
   image = null,
 }) => {
   const [imageFailed, setImageFailed] = useState(false); // State to track image load failure
@@ -76,7 +78,12 @@ export const CraftsmanCard: React.FC<CraftsmanProps> = ({
         <div className="mt-4">
           {address && (
             <p className="text-xs font-inter text-[#8D5524] mb-2" dir="rtl">
-              {address}
+             <span className="font-bold">العنوان: </span> {address}
+            </p>
+          )}
+          {cities && (
+            <p className="text-xs font-inter text-[#8D5524] mb-2" dir="rtl">
+             <span className="font-bold">المدن المتاحة: </span>{cities}
             </p>
           )}
           <p className="text-sm font-inter text-[#8D5524] leading-relaxed"  dir="rtl">

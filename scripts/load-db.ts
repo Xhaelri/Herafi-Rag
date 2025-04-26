@@ -1,18 +1,17 @@
-import { DataAPIClient } from "@datastax/astra-db-ts";
+
+import { Pinecone } from "@pinecone-database/pinecone";
 import dotenv from "dotenv";
 import axios from "axios";
-dotenv.config();
 import { generateSentenceEmbedding } from "../lib/sentence-transformer-embedding";
+import { v4 as uuidv4 } from "uuid";
 
-type SimilarityMetric = "cosine" | "dot_product" | "euclidean";
+dotenv.config();
 
 const {
-  ASTRA_DB_NAMESPACE,
-  ASTRA_DB_COLLECTION,
-  ASTRA_DB_API_ENDPOINT,
-  ASTRA_DB_APPLICATION_TOKEN,
+  PINECONE_API_KEY,
+  PINECONE_INDEX_NAME,
   SENTENCE_TRANSFORMER_API_URL,
-  CRAFTSMEN_API_TOKEN,
+  NEXT_PUBLIC_TOKEN,
 } = process.env;
 
 const CRAFTSMEN_API_URL = "http://20.199.86.3/api/client/search";
@@ -24,101 +23,65 @@ const craftsToFetch = [
   "كهربائي",
   "نقاش",
   "فني تكييف",
-  "خراط",
 ];
-
-const client = new DataAPIClient(ASTRA_DB_APPLICATION_TOKEN!);
-const db = client.db(ASTRA_DB_API_ENDPOINT!, { keyspace: ASTRA_DB_NAMESPACE });
 
 const embeddingDimension = 384;
 
-console.log("Environment variables check:");
-console.log("ASTRA_DB_NAMESPACE:", !!ASTRA_DB_NAMESPACE);
-console.log("ASTRA_DB_COLLECTION:", !!ASTRA_DB_COLLECTION);
-console.log("ASTRA_DB_API_ENDPOINT:", !!ASTRA_DB_API_ENDPOINT);
-console.log("ASTRA_DB_APPLICATION_TOKEN:", !!ASTRA_DB_APPLICATION_TOKEN);
-console.log("SENTENCE_TRANSFORMER_API_URL:", !!SENTENCE_TRANSFORMER_API_URL);
+// Initialize Pinecone client
+const pinecone = new Pinecone({
+  apiKey: PINECONE_API_KEY!,
+});
 
-async function checkCollection() {
+console.log("Environment variables check:", {
+  PINECONE_API_KEY: !!PINECONE_API_KEY,
+  PINECONE_INDEX_NAME: !!PINECONE_INDEX_NAME,
+  SENTENCE_TRANSFORMER_API_URL: !!SENTENCE_TRANSFORMER_API_URL,
+  NEXT_PUBLIC_TOKEN: !!NEXT_PUBLIC_TOKEN,
+});
+
+async function checkIndex() {
   try {
-    const collection = await db.collection(ASTRA_DB_COLLECTION!);
-    const count = await collection.countDocuments({}, 1000);
-    console.log(
-      `Collection ${ASTRA_DB_COLLECTION} exists with ${count} documents`
-    );
-    return { exists: true, count };
+    const indexList = await pinecone.listIndexes();
+    // Convert IndexList to array for compatibility
+    const indexes = indexList.indexes || [];
+    const indexExists = indexes.some((index) => index.name === PINECONE_INDEX_NAME);
+    console.log(`Index ${PINECONE_INDEX_NAME} exists: ${indexExists}`);
+    return indexExists;
   } catch (error) {
-    return { exists: false, count: 0 };
+    console.error("Error checking index:", error.message);
+    return false;
   }
 }
 
-const createCollection = async (
-  similarityMetric: SimilarityMetric = "cosine"
-) => {
+async function createIndex() {
   try {
-    const collectionStatus = await checkCollection();
-
-    if (collectionStatus.exists) {
-      console.log(
-        `Collection ${ASTRA_DB_COLLECTION} already exists with ${collectionStatus.count} documents`
-      );
-
-      if (collectionStatus.count === 0) {
-        console.log(
-          "Collection exists but is empty. Consider dropping and recreating it."
-        );
-      }
-
-      if (
-        !ASTRA_DB_NAMESPACE ||
-        !ASTRA_DB_COLLECTION ||
-        !ASTRA_DB_API_ENDPOINT ||
-        !ASTRA_DB_APPLICATION_TOKEN ||
-        !SENTENCE_TRANSFORMER_API_URL
-      ) {
-        throw new Error("Missing required environment variables");
-      }
-
-      return;
-    }
-
-    const res = await db.createCollection(ASTRA_DB_COLLECTION!, {
-      vector: {
-        dimension: embeddingDimension,
-        metric: similarityMetric,
+    await pinecone.createIndex({
+      name: PINECONE_INDEX_NAME!,
+      dimension: embeddingDimension,
+      metric: "cosine",
+      spec: {
+        serverless: {
+          cloud: "aws",
+          region: "us-east-1", // Adjust region as needed
+        },
       },
     });
-    console.log(res);
+    console.log(`Index ${PINECONE_INDEX_NAME} created successfully`);
+    // Wait for index to be ready
+    await new Promise((resolve) => setTimeout(resolve, 30000)); // 30 seconds
   } catch (error) {
-    if (error.name === "CollectionAlreadyExistsError") {
-      console.log(
-        `Collection ${ASTRA_DB_COLLECTION} already exists. Skipping creation.`
-      );
-      if (
-        !ASTRA_DB_NAMESPACE ||
-        !ASTRA_DB_COLLECTION ||
-        !ASTRA_DB_API_ENDPOINT ||
-        !ASTRA_DB_APPLICATION_TOKEN ||
-        !SENTENCE_TRANSFORMER_API_URL
-      ) {
-        throw new Error("Missing required environment variables");
-      }
-    } else if (error.message && error.message.includes("different settings")) {
-      console.error(
-        "Collection exists with different settings. Consider using a different collection name or dropping the existing one."
-      );
-      throw error;
+    if (error.message.includes("already exists")) {
+      console.log(`Index ${PINECONE_INDEX_NAME} already exists. Skipping creation.`);
     } else {
-      console.error("Error creating collection:", error);
+      console.error("Error creating index:", error.message);
       throw error;
     }
   }
-};
+}
 
 async function fetchCraftsmenData(craft: string, page: number = 1) {
   try {
     console.log(`Fetching ${craft} craftsmen data, page ${page}...`);
-
     const response = await axios.post(
       CRAFTSMEN_API_URL,
       {
@@ -128,7 +91,7 @@ async function fetchCraftsmenData(craft: string, page: number = 1) {
       },
       {
         headers: {
-          Authorization: CRAFTSMEN_API_TOKEN,
+          Authorization: NEXT_PUBLIC_TOKEN,
           Accept: "application/json",
           "Content-Type": "application/json",
         },
@@ -136,9 +99,7 @@ async function fetchCraftsmenData(craft: string, page: number = 1) {
     );
 
     if (response.data && response.data.status === true) {
-      console.log(
-        `Successfully fetched ${response.data.data.data.length} ${craft} craftsmen from page ${page}`
-      );
+      console.log(`Successfully fetched ${response.data.data.data.length} ${craft} craftsmen from page ${page}`);
       return response.data.data;
     } else {
       console.error(`Error fetching ${craft} craftsmen:`, response.data);
@@ -149,7 +110,6 @@ async function fetchCraftsmenData(craft: string, page: number = 1) {
     if (error.response) {
       console.error("Response data:", error.response.data);
       console.error("Response status:", error.response.status);
-      console.error("Response headers:", error.response.headers);
     } else if (error.request) {
       console.error("No response received:", error.request);
     }
@@ -157,108 +117,187 @@ async function fetchCraftsmenData(craft: string, page: number = 1) {
   }
 }
 
-function formatCraftsmanData(craftsman) {
-  let formattedText = `اسم الحرفي: ${craftsman.name}\n`;
-  formattedText += `المهنة: ${craftsman.craft?.name || "غير محدد"}\n`;
-  formattedText += `العنوان: ${craftsman.address || "غير محدد"}\n`;
+function formatCraftsmanDescription(craftsman: any): string {
+  let description = `اسم الحرفي: ${craftsman.name}\n`;
+  description += `المهنة: ${craftsman.craft?.name || "غير محدد"}\n`;
+  description += `العنوان: ${craftsman.address || "غير محدد"}\n`;
 
   if (craftsman.cities && craftsman.cities.length > 0) {
-    formattedText += `المدن: ${craftsman.cities
-      .map((c) => c.city)
-      .join(", ")}\n`;
+    description += `المدن: ${craftsman.cities.map((c: any) => c.city).join(", ")}\n`;
   }
 
   if (craftsman.average_rating) {
-    formattedText += `التقييم: ${craftsman.average_rating} (عدد التقييمات: ${
-      craftsman.number_of_ratings || 0
-    })\n`;
+    description += `التقييم: ${craftsman.average_rating} (عدد التقييمات: ${craftsman.number_of_ratings || 0})\n`;
   } else {
-    formattedText += "التقييم: غير متوفر\n";
+    description += "التقييم: غير متوفر\n";
   }
 
-  formattedText += `الوظائف المنجزة: ${craftsman.done_jobs_num || 0}\n`;
-  formattedText += `الوظائف النشطة: ${craftsman.active_jobs_num || 0}\n`;
+  description += `الوظائف المنجزة: ${craftsman.done_jobs_num || 0}\n`;
+  description += `الوظائف النشطة: ${craftsman.active_jobs_num || 0}\n`;
 
   if (craftsman.description) {
-    formattedText += `الوصف: ${craftsman.description}\n`;
+    description += `الوصف: ${craftsman.description}\n`;
   }
 
-  formattedText += `الحالة: ${
-    craftsman.status === "free" ? "متاح" : "مشغول"
-  }\n`;
+  description += `الحالة: ${craftsman.status === "free" ? "متاح" : "مشغول"}\n`;
 
-  // Add image URL if available
   if (craftsman.image) {
-    formattedText += `رابط الصورة: ${craftsman.image}\n`;
+    description += `رابط الصورة: ${craftsman.image}\n`;
   }
 
-  return formattedText;
+  return description;
 }
 
-export const loadSampleData = async () => {
+async function validateEmbedding(vector: number[] | null | undefined): Promise<boolean> {
+  if (!vector || !Array.isArray(vector) || vector.length !== embeddingDimension) {
+    console.error("Invalid embedding:", {
+      isArray: Array.isArray(vector),
+      length: vector ? vector.length : "undefined",
+      sample: vector && Array.isArray(vector) ? vector.slice(0, 5) : "N/A",
+    });
+    return false;
+  }
+  return true;
+}
+
+export const loadSampleData = async (clearIndex: boolean = false) => {
   console.log("Starting to load craftsmen data...");
   try {
-    const collection = await db.collection(ASTRA_DB_COLLECTION!);
+    if (clearIndex) {
+      console.log("Clearing existing index...");
+      try {
+        await pinecone.deleteIndex(PINECONE_INDEX_NAME!);
+        console.log(`Index ${PINECONE_INDEX_NAME} deleted successfully`);
+        // Wait for deletion to propagate
+        await new Promise((resolve) => setTimeout(resolve, 10000)); // 10 seconds
+      } catch (error) {
+        console.error("Error deleting index:", error.message);
+      }
+    }
 
-    console.log(`Connected to collection: ${ASTRA_DB_COLLECTION}`);
+    let indexExists = await checkIndex();
+    if (!indexExists) {
+      await createIndex();
+      indexExists = await checkIndex();
+      if (!indexExists) {
+        throw new Error("Index creation failed or index not found after creation");
+      }
+    }
+
+    const index = pinecone.Index(PINECONE_INDEX_NAME!);
+    console.log(`Connected to index: ${PINECONE_INDEX_NAME}`);
 
     let totalDocuments = 0;
+    let failedInsertions = 0;
 
     for (const craft of craftsToFetch) {
       console.log(`Processing craft: ${craft}`);
-
       let currentPage = 1;
       let hasMorePages = true;
 
       while (hasMorePages) {
         const apiResponse = await fetchCraftsmenData(craft, currentPage);
 
-        if (
-          !apiResponse ||
-          !apiResponse.data ||
-          apiResponse.data.length === 0
-        ) {
+        if (!apiResponse || !apiResponse.data || apiResponse.data.length === 0) {
           console.log(`No more data for ${craft}`);
           hasMorePages = false;
           continue;
         }
 
         const craftsmen = apiResponse.data;
-        console.log(
-          `Processing ${craftsmen.length} ${craft} craftsmen from page ${currentPage}`
-        );
+        console.log(`Processing ${craftsmen.length} ${craft} craftsmen from page ${currentPage}`);
 
         for (const craftsman of craftsmen) {
-          const formattedText = formatCraftsmanData(craftsman);
+          const craftName = craftsman.craft?.name || "حرفي";
+          const cities = craftsman.cities?.map((c: any) => c.city) || ["مصر"];
+          const keywords = ["حرفي", craftName, ...cities];
+          const embeddingText = keywords.join(", ");
 
           try {
-            console.log(`Processing craftsman: ${craftsman.name}`);
-            const embeddingResult = await generateSentenceEmbedding(
-              formattedText
-            );
-            const vector = embeddingResult.embedding;
+            console.log(`Generating embedding for craftsman: ${craftsman.name} (${embeddingText})`);
+            const embeddingResult = await generateSentenceEmbedding(embeddingText);
+            const vectorArray = embeddingResult.embedding;
 
-            const res = await collection.insertOne({
-              $vector: vector,
-              text: formattedText,
-              title: `${craftsman.name} - ${craftsman.craft?.name || "حرفي"}`,
-              sourceId: craftsman.id.toString(),
-              craft: craftsman.craft?.name || "",
-              cities: craftsman.cities?.map((c) => c.city) || [],
-              keywords: [
-                "حرفي",
-                craftsman.craft?.name || "",
-                ...(craftsman.cities?.map((c) => c.city) || []),
-              ],
-              timestamp: new Date().toISOString(),
-              image: craftsman.image || null, // Store image URL as a separate field
-              rawData: craftsman,
+            if (!(await validateEmbedding(vectorArray))) {
+              console.error(`Skipping insertion for ${craftsman.name} due to invalid embedding`);
+              failedInsertions++;
+              continue;
+            }
+
+            console.log("Embedding sample:", vectorArray.slice(0, 5));
+
+            const vectorId = uuidv4();
+            const vectorRecord = {
+              id: vectorId,
+              values: vectorArray,
+              metadata: {
+                id: craftsman.id.toString(),
+                name: craftsman.name,
+                category: craftName,
+                description: formatCraftsmanDescription(craftsman),
+                rating: craftsman.average_rating?.toString() || "0",
+                cities: cities,
+                keywords: keywords,
+                timestamp: new Date().toISOString(),
+                image: craftsman.image || null,
+              },
+            };
+
+            console.log(`Vector to insert for ${craftsman.name}:`, {
+              id: vectorId,
+              name: craftsman.name,
+              vectorSample: vectorRecord.values.slice(0, 5),
+              vectorLength: vectorRecord.values.length,
+              keywords: vectorRecord.metadata.keywords,
             });
 
-            console.log(`Document inserted with ID: ${res.insertedId}`);
-            totalDocuments++;
+            await index.upsert([vectorRecord]);
+            console.log(`Vector inserted with ID: ${vectorId}`);
+
+            // Verify insertion by querying the vector
+            const queryResult = await index.query({
+              id: vectorId,
+              topK: 1,
+              includeMetadata: true,
+              includeValues: true,
+            });
+
+            if (!queryResult.matches || queryResult.matches.length === 0) {
+              console.error(`Inserted vector not found for ${craftsman.name} (ID: ${vectorId})`);
+              failedInsertions++;
+              continue;
+            }
+
+            const retrievedVector = queryResult.matches[0];
+            const hasVector = retrievedVector.values && Array.isArray(retrievedVector.values) && retrievedVector.values.length === embeddingDimension;
+            const vectorSample = hasVector ? retrievedVector.values.slice(0, 5) : retrievedVector.values;
+
+            console.log(`Retrieved vector for ${craftsman.name}:`, {
+              vectorValue: vectorSample,
+              vectorType: retrievedVector.values ? typeof retrievedVector.values : "undefined",
+              isArray: Array.isArray(retrievedVector.values),
+              metadata: retrievedVector.metadata,
+            });
+
+            if (!hasVector) {
+              console.error(`Vector field invalid for ${craftsman.name} (ID: ${vectorId})`, {
+                vectorValue: retrievedVector.values,
+                vectorType: retrievedVector.values ? typeof retrievedVector.values : "undefined",
+                isArray: Array.isArray(retrievedVector.values),
+                metadata: retrievedVector.metadata,
+              });
+              failedInsertions++;
+            } else {
+              console.log(`Vector verified for ${craftsman.name} (ID: ${vectorId})`, {
+                vectorLength: retrievedVector.values.length,
+                vectorSample,
+                keywordCount: (retrievedVector.metadata?.keywords as string[])?.length || 0,
+              });
+              totalDocuments++;
+            }
           } catch (error) {
-            console.error("Error processing craftsman:", error);
+            console.error(`Error processing craftsman ${craftsman.name}:`, error.message);
+            failedInsertions++;
           }
         }
 
@@ -270,59 +309,98 @@ export const loadSampleData = async () => {
       }
     }
 
-    console.log(`Total craftsmen documents inserted: ${totalDocuments}`);
+    console.log(`Total craftsmen vectors inserted: ${totalDocuments}`);
+    console.log(`Failed insertions: ${failedInsertions}`);
+    if (failedInsertions > 0) {
+      console.warn("Some vectors were not inserted correctly. Check logs for details.");
+    }
   } catch (error) {
-    console.error("Error in loadSampleData:", error);
+    console.error("Error in loadSampleData:", error.message);
     throw error;
   }
 };
 
-async function deleteCollection() {
+async function deleteIndex() {
   try {
-    await db.dropCollection(ASTRA_DB_COLLECTION!);
-    console.log(`Collection ${ASTRA_DB_COLLECTION} deleted successfully`);
+    await pinecone.deleteIndex(PINECONE_INDEX_NAME!);
+    console.log(`Index ${PINECONE_INDEX_NAME} deleted successfully`);
     return true;
   } catch (error) {
-    console.error("Error deleting collection:", error);
+    console.error("Error deleting index:", error.message);
     return false;
   }
 }
 
 async function debugDbContents() {
   try {
-    const collection = await db.collection(ASTRA_DB_COLLECTION!);
-    const count = await collection.countDocuments({}, 1000);
-    console.log(`Total documents in ${ASTRA_DB_COLLECTION}: ${count}`);
+    const index = pinecone.Index(PINECONE_INDEX_NAME!);
+    const stats = await index.describeIndexStats();
+    console.log(`Total vectors in ${PINECONE_INDEX_NAME}: ${stats.totalRecordCount || 0}`);
 
-    if (count > 0) {
-      const sample = await collection.findOne({});
-      console.log("Sample document:", {
-        id: sample._id,
-        title: sample.title || "No title",
-        text_preview: sample.text.substring(0, 100),
-        craft: sample.craft || "No craft",
-        cities: sample.cities || "No cities",
-        keywords: sample.keywords || "No keywords",
-        image: sample.image || "No image",
-        vector_length: sample.$vector
-          ? sample.$vector.length
-          : "No vector found",
+    if (stats.totalRecordCount > 0) {
+      // Query a sample of vectors
+      const sampleQuery = await index.query({
+        vector: Array(embeddingDimension).fill(0), // Dummy vector for sampling
+        topK: 5,
+        includeMetadata: true,
+        includeValues: true,
       });
+
+      sampleQuery.matches?.forEach((match: any) => {
+        const hasVector = match.values && Array.isArray(match.values);
+        const vectorSample = hasVector ? match.values.slice(0, 5) : match.values;
+        console.log(`Vector ${match.id}:`, {
+          name: match.metadata?.name || "No name",
+          category: match.metadata?.category || "No category",
+          cities: match.metadata?.cities || "No cities",
+          keywords: match.metadata?.keywords || "No keywords",
+          image: match.metadata?.image || "No image",
+          vector_length: hasVector ? match.values.length : "No vector found",
+          vector_sample: vectorSample,
+          has_vector: hasVector,
+          vector_type: match.values ? typeof match.values : "None",
+          is_array: Array.isArray(match.values),
+          metadata_fields: match.metadata ? Object.keys(match.metadata) : [],
+        });
+      });
+
+      // Check for vectors with invalid values
+      const allVectors = await index.query({
+        vector: Array(embeddingDimension).fill(0),
+        topK: stats.totalRecordCount,
+        includeValues: true,
+      });
+
+      const invalidVectors = allVectors.matches?.filter(
+        (match: any) => !match.values || !Array.isArray(match.values) || match.values.length !== embeddingDimension
+      ) || [];
+
+      console.log(`Vectors with invalid or missing values: ${invalidVectors.length}`);
+      if (invalidVectors.length > 0) {
+        console.warn("Sample invalid vectors:", invalidVectors.slice(0, 2).map((match: any) => ({
+          id: match.id,
+          vectorValue: match.values,
+          vectorType: match.values ? typeof match.values : "undefined",
+          isArray: Array.isArray(match.values),
+        })));
+      }
     }
   } catch (error) {
-    console.error("Error debugging DB contents:", error);
+    console.error("Error debugging index contents:", error.message);
   }
 }
 
 async function testApiConnection() {
   console.log("Testing API connection...");
   try {
-    const testResponse = await axios.get(
-      CRAFTSMEN_API_URL.replace("/search", ""),
+    const testResponse = await axios.post(
+      CRAFTSMEN_API_URL,
+      { pagination: 1, page: 1, craft: "سباك" },
       {
         headers: {
-          Authorization: CRAFTSMEN_API_TOKEN,
+          Authorization: NEXT_PUBLIC_TOKEN,
           Accept: "application/json",
+          "Content-Type": "application/json",
         },
       }
     );
@@ -332,22 +410,39 @@ async function testApiConnection() {
     console.error("API connection test failed:", error.message);
     if (error.response) {
       console.error("Response status:", error.response.status);
+      console.error("Response data:", error.response.data);
     }
     console.log("Please verify the API endpoint and authentication token");
+  }
+}
+
+async function testEmbeddingGeneration() {
+  console.log("Testing embedding generation...");
+  try {
+    const testInput = "سباك في المنصورة";
+    const result = await generateSentenceEmbedding(testInput);
+    const vector = result.embedding;
+    console.log("Embedding test result:", {
+      input: testInput,
+      isArray: Array.isArray(vector),
+      length: vector ? vector.length : "undefined",
+      sample: vector && Array.isArray(vector) ? vector.slice(0, 5) : "N/A",
+      valid: await validateEmbedding(vector),
+    });
+  } catch (error) {
+    console.error("Embedding generation test failed:", error.message);
   }
 }
 
 async function main() {
   try {
     await testApiConnection();
-
-    await createCollection();
-
-    await loadSampleData();
+    await testEmbeddingGeneration();
+    await loadSampleData(true);
     await debugDbContents();
     console.log("Script completed successfully");
   } catch (error) {
-    console.error("Script failed:", error);
+    console.error("Script failed:", error.message);
     process.exit(1);
   }
 }
