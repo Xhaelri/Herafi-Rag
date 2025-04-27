@@ -189,7 +189,7 @@ export function extractCraftsmanData(text: string): Craftsman[] {
           ? completedJobs
           : undefined,
         activeJobs: !isNaN(activeJobs as number) ? activeJobs : undefined,
-        image: extractedRawData.image || null, // Add extracted image field
+        image: extractedRawData.image || null, 
       });
     } catch (error) {
       console.error(

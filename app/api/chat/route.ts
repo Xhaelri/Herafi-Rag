@@ -18,7 +18,7 @@ function normalizeArabicText(text: string): string {
 
 // Escape special characters for regex
 function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 // Calculate cosine similarity between two vectors (for fallback)
@@ -479,14 +479,13 @@ const allCities = Object.values(governoratesWithCities)
 console.log("All normalized cities:", allCities); // Debug: Log all normalized cities
 const escapedCities = allCities.map(escapeRegExp); // Escape special characters
 // Use a more flexible boundary check instead of \\b
-const cityRegex = new RegExp(`(^|\\s)(${escapedCities.join('|')})(\\s|$)`, 'iu');
+const cityRegex = new RegExp(
+  `(^|\\s)(${escapedCities.join("|")})(\\s|$)`,
+  "iu"
+);
 console.log("City regex pattern:", cityRegex.source); // Debug: Log regex pattern
 
-const {
-  PINECONE_API_KEY,
-  PINECONE_INDEX_NAME,
-  GOOGLE_API_KEY,
-} = process.env;
+const { PINECONE_API_KEY, PINECONE_INDEX_NAME, GOOGLE_API_KEY } = process.env;
 
 console.log("Environment check:", {
   hasPineconeApiKey: !!PINECONE_API_KEY,
@@ -558,7 +557,10 @@ export async function POST(req: Request) {
       clientCity = originalCity || clientCity;
       console.log(`Mapped to original city: ${clientCity}`);
     } else {
-      console.log("No city detected in query. Normalized text:", normalizedText);
+      console.log(
+        "No city detected in query. Normalized text:",
+        normalizedText
+      );
       console.log("Normalized city list sample:", allCities.slice(0, 10));
       console.log("City regex pattern:", cityRegex.source);
       // Fallback: Test explicit match for "اجا"
@@ -567,7 +569,9 @@ export async function POST(req: Request) {
       console.log("Fallback regex match for 'اجا':", fallbackMatch);
     }
 
-    const craftMatch = normalizedText.match(/(سباك|نجار|كهربائي|حداد|فني تكييف|نقاش)/i);
+    const craftMatch = normalizedText.match(
+      /(سباك|نجار|كهربائي|حداد|فني تكييف|نقاش)/i
+    );
     if (craftMatch) {
       craftType = craftMatch[0];
       console.log(`Detected craft type: ${craftType}`);
@@ -652,23 +656,32 @@ export async function POST(req: Request) {
                   doc.$vector
                 );
                 console.log(
-                  `Computed similarity for doc ${doc._id}: ${doc._similarity.toFixed(4)}`
+                  `Computed similarity for doc ${
+                    doc._id
+                  }: ${doc._similarity.toFixed(4)}`
                 );
               }
               return doc;
             })
             .filter((doc) => {
-              const hasVector = doc.$vector && Array.isArray(doc.$vector) && doc.$vector.length === EMBED_DIMENSION;
-              console.log(`Document ${doc._id || 'unknown'}:`, {
-                similarity: doc._similarity?.toFixed(4) || 'N/A',
+              const hasVector =
+                doc.$vector &&
+                Array.isArray(doc.$vector) &&
+                doc.$vector.length === EMBED_DIMENSION;
+              console.log(`Document ${doc._id || "unknown"}:`, {
+                similarity: doc._similarity?.toFixed(4) || "N/A",
                 hasVector,
-                vectorLength: doc.$vector?.length || 'N/A',
-                cities: doc.cities || 'N/A',
-                craft: doc.category || 'N/A',
-                rating: doc.rating || 'N/A',
+                vectorLength: doc.$vector?.length || "N/A",
+                cities: doc.cities || "N/A",
+                craft: doc.category || "N/A",
+                rating: doc.rating || "N/A",
                 text_preview: doc.text.substring(0, 100),
               });
-              return BYPASS_SIMILARITY || (doc._similarity !== undefined && doc._similarity >= MIN_SIMILARITY);
+              return (
+                BYPASS_SIMILARITY ||
+                (doc._similarity !== undefined &&
+                  doc._similarity >= MIN_SIMILARITY)
+              );
             });
           console.log(
             `${relevantDocuments.length} documents meet similarity (${MIN_SIMILARITY}) threshold`
@@ -689,8 +702,8 @@ export async function POST(req: Request) {
           // Sort by rating if similarity is bypassed, else by similarity
           relevantDocuments.sort((a, b) => {
             if (BYPASS_SIMILARITY) {
-              const ratingA = parseFloat(a.rating || '2');
-              const ratingB = parseFloat(b.rating || '2');
+              const ratingA = parseFloat(a.rating || "2");
+              const ratingB = parseFloat(b.rating || "2");
               return ratingB - ratingA;
             }
             return (b._similarity || 0) - (a._similarity || 0);
@@ -701,7 +714,8 @@ export async function POST(req: Request) {
               const similarity = doc._similarity
                 ? `(مدى الصلة: ${doc._similarity.toFixed(2)})`
                 : "(درجة الصلة غير متوفرة)";
-              const title = doc.name || doc.text.split("\n")[0].substring(0, 50) + "...";
+              const title =
+                doc.name || doc.text.split("\n")[0].substring(0, 50) + "...";
               const sourceId = doc._id || `doc-${i + 1}`;
               const sourceIdMetadata = `sourceId: ${sourceId}`;
 
@@ -731,7 +745,9 @@ export async function POST(req: Request) {
     } catch (error) {
       console.error("DB query error:", error);
       console.error("Error details:", JSON.stringify(error, null, 2));
-      docContext = `حدث خطأ أثناء استرداد معلومات السياق: ${error instanceof Error ? error.message : String(error)}.`;
+      docContext = `حدث خطأ أثناء استرداد معلومات السياق: ${
+        error instanceof Error ? error.message : String(error)
+      }.`;
     }
 
     const systemPrompt = `
@@ -748,8 +764,12 @@ ${docContext}
     - **ثانياً:** ابحث بدقة في \`السياق المسترجع\` عن **قائمة حرفيين** تطابق النوع المطلوب (مثل "${craftType}").
     - **إذا وجدت قائمة:** 
       - اكتب رسالة موجزة تقول أنك وجدت حرفيين مناسبين، مثل: "وجدت لك حرفيين متخصصين في ${craftType}${
-        clientCity ? ` في ${clientCity}` : ""
-      }${usedRelaxedFilters ? " (تم توسيع نطاق البحث لتضمين المزيد من الخيارات)" : ""}:"
+      clientCity ? ` في ${clientCity}` : ""
+    }${
+      usedRelaxedFilters
+        ? " (تم توسيع نطاق البحث لتضمين المزيد من الخيارات)"
+        : ""
+    }:"
       - ثم احتفظ بتنسيق المستندات الأصلي مع بداية كل مستند بـ "--- المستند" ونهايته بـ "--- نهاية المستند" لكي يتمكن نظام العرض من استخراج البيانات وعرضها في بطاقات
       - لا تكرر المعلومات التي ستظهر في البطاقات في نص رسالتك
     - **إذا لم تجد قائمة:** أخبر المستخدم بوضوح أنك لم تعثر على ${craftType} في ${
@@ -765,7 +785,7 @@ ${docContext}
       - لا تكرر معلومات الحرفيين في نص رسالتك.
     - إذا لم تجد قائمة حرفيين في المدينة:
       - أخبر المستخدم: "لم أجد حرفيين في ${clientCity}. يمكنك زيارة موقع حرفي للعثور على حرفيين في منطقتك مع تقييمات ومراجعات المستخدمين."
-    - إذا كان السياق يحتوي على حرفيين ولكن المستخدم لم يحدد نوع الحرفي، لا تفترض نوعًا معينًا (مثل "سباك")، بل اعرض كل الحرفيين المتاحين أو اسأل المستخدم عن نوع الحرفي المطلوب.
+    -  إذا كان السياق يحتوي على حرفيين ولكن المستخدم لم يحدد نوع الحرفي، لا تفترض نوعًا معينًا (مثل "سباك")،  اذا كان غير واضح من السياق ما الحرفة التي يحتاجها المستخدم، فاسأل المستخدم عن نوع الحرفي المطلوب.
 
 3. **إذا كان طلب المستخدم يتعلق بحل مشكلة منزلية أو استفسار عام** (ولم يطلب حرفي بشكل صريح):
     - حاول أولاً تقديم نصائح عملية وخطوات لمساعدته على حل المشكلة بنفسه.
@@ -776,7 +796,9 @@ ${docContext}
 
 4. **هام جداً: عند عرض الحرفيين:**
     - لا تكرر بيانات الحرفيين في نص رسالتك لأنها ستظهر في بطاقات منفصلة
-    - اكتف بجملة مثل "وجدت لك حرفيين متخصصين في ${craftType ? craftType : 'حرفيين'} في ${clientCity || ''}:"
+    - اكتف بجملة مثل "وجدت لك حرفيين متخصصين في ${
+      craftType ? craftType : "حرفيين"
+    } في ${clientCity || ""}:"
     - ثم ضع بيانات الحرفيين بالتنسيق المطلوب مع الحفاظ على العلامات التالية:
       - "--- المستند رقم:"
       - "sourceId: [رقم]"
@@ -909,23 +931,24 @@ async function queryWithFilters(
     filter: Object.keys(filter).length > 0 ? filter : undefined,
   });
 
-  let documents = queryResult.matches?.map((match: any) => ({
-    _id: match.id,
-    $vector: match.values,
-    _similarity: match.score,
-    text: match.metadata.description,
-    name: match.metadata.name,
-    category: match.metadata.category,
-    cities: match.metadata.cities,
-    rating: match.metadata.rating,
-    keywords: match.metadata.keywords,
-    image: match.metadata.image,
-  })) || [];
+  let documents =
+    queryResult.matches?.map((match: any) => ({
+      _id: match.id,
+      $vector: match.values,
+      _similarity: match.score,
+      text: match.metadata.description,
+      name: match.metadata.name,
+      category: match.metadata.category,
+      cities: match.metadata.cities,
+      rating: match.metadata.rating,
+      keywords: match.metadata.keywords,
+      image: match.metadata.image,
+    })) || [];
 
   if (applyRatingFilter) {
     documents = documents.filter((doc: any) => {
-      const rating = parseFloat(doc.rating || '2');
-      console.log(`Rating check for doc ${doc._id || 'unknown'}:`, {
+      const rating = parseFloat(doc.rating || "2");
+      console.log(`Rating check for doc ${doc._id || "unknown"}:`, {
         rating,
         meetsRating: rating >= MIN_RATING,
       });
