@@ -2,7 +2,6 @@
 
 import { Message } from "@ai-sdk/react";
 import { useEffect, useRef, useState } from "react";
-<<<<<<< HEAD:components/Ai/components/ui/ChatContainer.tsx
 import MessageList from "./MessageList";
 import InputArea from "./InputArea";
 import EmptyState from "./EmptyState";
@@ -11,35 +10,10 @@ import { Craftsman } from "@/typs";
 
 const api = "/api/chat";
 
-=======
-import ChatHeader from "@/components/ui/ChatHeader";
-import MessageList from "@/components/ui/MessageList";
-import InputArea from "@/components/ui/InputArea";
-import EmptyState from "@/components/ui/EmptyState";
-import { extractCraftsmanData, messageContainsCraftsmanData } from "@/lib/extract-craftsman-data";
-
-const api = "/api/chat";
-
-interface Craftsman {
-  id: string;
-  name: string;
-  craft: string;
-  rating?: number;
-  reviewCount?: number;
-  address?: string;
-  description?: string;
-  status?: string;
-  cities?: string;
-  completedJobs?: number;
-  activeJobs?: number;
-  image?: string | null;
-}
->>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatContainer.tsx
 
 export default function ChatContainer() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-<<<<<<< HEAD:components/Ai/components/ui/ChatContainer.tsx
   const [userMessages, setUserMessages] = useState<Message[]>(() => {
     const saved = localStorage.getItem("chatMessages");
     if (saved) {
@@ -60,10 +34,6 @@ export default function ChatContainer() {
     }
     return [];
   });
-=======
-  const [userMessages, setUserMessages] = useState<Message[]>([]);
-  const [assistantMessages, setAssistantMessages] = useState<Message[]>([]);
->>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatContainer.tsx
   const allMessages = [...userMessages, ...assistantMessages].sort(
     (a, b) =>
       new Date(a.createdAt ?? Date.now()).getTime() -
@@ -96,7 +66,6 @@ export default function ChatContainer() {
   }, [allMessages, processingMessageIds]);
 
   useEffect(() => {
-<<<<<<< HEAD:components/Ai/components/ui/ChatContainer.tsx
     localStorage.setItem(
       "chatMessages",
       JSON.stringify({
@@ -104,19 +73,13 @@ export default function ChatContainer() {
         timestamp: Date.now(),
       })
     );
-=======
     console.log("All messages:", allMessages);
->>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatContainer.tsx
   }, [allMessages]);
 
   useEffect(() => {
     const lastMessage = allMessages[allMessages.length - 1];
     const messageId = lastMessage?.id;
-<<<<<<< HEAD:components/Ai/components/ui/ChatContainer.tsx
   
-=======
-
->>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatContainer.tsx
     if (
       messageId &&
       lastMessage.role === "assistant" &&
@@ -127,21 +90,14 @@ export default function ChatContainer() {
       const textPart = Array.isArray(lastMessage.content)
         ? lastMessage.content.find((part) => part.type === "text")?.text
         : lastMessage.content;
-<<<<<<< HEAD:components/Ai/components/ui/ChatContainer.tsx
   
-=======
-
->>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatContainer.tsx
       if (textPart && messageContainsCraftsmanData(textPart)) {
         setProcessingMessageIds((prev) => new Set(prev).add(messageId));
         queueMicrotask(() => {
           let data: Craftsman[] = [];
           try {
             data = extractCraftsmanData(textPart);
-<<<<<<< HEAD:components/Ai/components/ui/ChatContainer.tsx
             console.log("Extracted craftsmen data:", data);
-=======
->>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatContainer.tsx
           } catch (extractionError) {
             console.error(
               `Message ${messageId}: Error during extraction ->`,
@@ -163,15 +119,8 @@ export default function ChatContainer() {
       }
     }
   }, [allMessages, isLoading, extractedCardData, processingMessageIds]);
-<<<<<<< HEAD:components/Ai/components/ui/ChatContainer.tsx
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-=======
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    console.log("Selected file:", file);
->>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatContainer.tsx
     if (file && file.type.startsWith("image/")) {
       if (file.size > 5 * 1024 * 1024) {
         alert("الصورة كبيرة جدًا. يرجى اختيار صورة أقل من 5 ميغابايت.");
@@ -181,10 +130,6 @@ export default function ChatContainer() {
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
-<<<<<<< HEAD:components/Ai/components/ui/ChatContainer.tsx
-=======
-        console.log("Image preview set:", reader.result);
->>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatContainer.tsx
       };
       reader.onerror = () => {
         console.error("Error reading file for preview");
@@ -193,10 +138,6 @@ export default function ChatContainer() {
     } else {
       setSelectedImage(null);
       setImagePreview(null);
-<<<<<<< HEAD:components/Ai/components/ui/ChatContainer.tsx
-=======
-      console.log("No valid image selected");
->>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatContainer.tsx
     }
   };
 
@@ -208,25 +149,10 @@ export default function ChatContainer() {
 
   const handleCustomSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-<<<<<<< HEAD:components/Ai/components/ui/ChatContainer.tsx
     if (!input.trim() && !selectedImage) {
       return;
     }
 
-=======
-    console.log(
-      "Submitting form, selectedImage:",
-      selectedImage,
-      "input:",
-      input
-    );
-    if (!input.trim() && !selectedImage) {
-      console.log("No input or image provided, submission aborted");
-      return;
-    }
-
-    // Clear the input field and image preview immediately after submission
->>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatContainer.tsx
     setInput("");
     setSelectedImage(null);
     setImagePreview(null);
@@ -243,10 +169,6 @@ export default function ChatContainer() {
           reader.onerror = () => reject(new Error("Failed to read image"));
           reader.readAsDataURL(selectedImage);
         });
-<<<<<<< HEAD:components/Ai/components/ui/ChatContainer.tsx
-=======
-        console.log("Base64 image generated, length:", base64Image.length);
->>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatContainer.tsx
         messageContent = [
           { type: "text", text: input.trim() || DEFAULT_IMAGE_TEXT },
           { type: "image", image: base64Image },
@@ -259,16 +181,8 @@ export default function ChatContainer() {
       }
     } else {
       messageContent = input.trim();
-<<<<<<< HEAD:components/Ai/components/ui/ChatContainer.tsx
     }
 
-=======
-      console.log("No image, using text only:", messageContent);
-    }
-
-    console.log("Submitting message content:", JSON.stringify(messageContent));
-
->>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatContainer.tsx
     const newMessage: Message = {
       id: Date.now().toString(),
       role: "user",
@@ -277,10 +191,6 @@ export default function ChatContainer() {
     };
     setUserMessages((prev) => [...prev, newMessage]);
 
-<<<<<<< HEAD:components/Ai/components/ui/ChatContainer.tsx
-=======
-    // Add temporary assistant message for loading
->>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatContainer.tsx
     const tempAssistantMessage: Message = {
       id: `temp-${newMessage.id}`,
       role: "assistant",
@@ -297,51 +207,21 @@ export default function ChatContainer() {
           messages: [...allMessages, newMessage],
         }),
       });
-<<<<<<< HEAD:components/Ai/components/ui/ChatContainer.tsx
       if (!response.ok) {
         throw new Error(`Backend error: ${response.statusText}`);
       }
       const result = await response.json();
 
-=======
-      console.log("Response status:", response.status, response.statusText);
-      const responseText = await response.text();
-      console.log("Raw response:", responseText);
-      if (!response.ok) {
-        throw new Error(
-          `Backend error: ${response.statusText}, Response: ${responseText}`
-        );
-      }
-      let result;
-      try {
-        result = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error("Failed to parse response as JSON:", parseError);
-        throw new Error(`Invalid JSON response: ${responseText}`);
-      }
-      console.log("Backend response:", result);
-
-      // Replace temporary message with actual response
->>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatContainer.tsx
       if (result && result.role === "assistant") {
         setAssistantMessages((prev) =>
           prev.filter((msg) => msg.id !== `temp-${newMessage.id}`).concat(result)
         );
-<<<<<<< HEAD:components/Ai/components/ui/ChatContainer.tsx
-=======
-      } else {
-        console.warn("No assistant response in result:", result);
->>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatContainer.tsx
       }
     } catch (error) {
       console.error("Error sending message to backend:", error);
       alert(
         "حدث خطأ أثناء إرسال الرسالة: " + (error.message || "خطأ غير معروف")
       );
-<<<<<<< HEAD:components/Ai/components/ui/ChatContainer.tsx
-=======
-      // Remove temporary message on error
->>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatContainer.tsx
       setAssistantMessages((prev) =>
         prev.filter((msg) => msg.id !== `temp-${newMessage.id}`)
       );
@@ -359,42 +239,24 @@ export default function ChatContainer() {
 
   return (
     <div
-<<<<<<< HEAD:components/Ai/components/ui/ChatContainer.tsx
       className="flex flex-col rounded-b-lg h-screen font-inter max-h-[500px]"
-=======
-      className="flex flex-col h-screen font-inter"
->>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatContainer.tsx
       style={{
         backgroundColor: "#F5F5F5",
         backgroundImage:
           "linear-gradient(135deg, rgba(196, 57, 43, 0.1) 0%, rgba(244, 208, 63, 0.1) 100%)",
       }}
-<<<<<<< HEAD:components/Ai/components/ui/ChatContainer.tsx
       dir="ltr"
     >
-=======
-    >
-      <ChatHeader />
-
->>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatContainer.tsx
       <main className="flex-1 overflow-y-auto p-4">
         <div className="max-w-3xl mx-auto space-y-6">
           {allMessages.length === 0 && !isLoading ? (
             <EmptyState />
           ) : (
-<<<<<<< HEAD:components/Ai/components/ui/ChatContainer.tsx
             <MessageList
               messages={allMessages}
               isLoading={isLoading}
               processingMessageIds={processingMessageIds}
               extractedCardData={extractedCardData}
-=======
-            <MessageList 
-              messages={allMessages} 
-              isLoading={isLoading} 
-              processingMessageIds={processingMessageIds} 
-              extractedCardData={extractedCardData} 
->>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatContainer.tsx
             />
           )}
           <div ref={messagesEndRef} />
