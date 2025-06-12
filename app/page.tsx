@@ -1,18 +1,34 @@
 "use client";
 
-import { Message } from "@ai-sdk/react";
-import { ArrowUp, Hammer, Loader2, Image as ImageIcon, User } from "lucide-react"; // Added User icon
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+type MessageContent =
+  | string
+  | Array<{ type: "text"; text: string } | { type: "image"; image: string }>;
+
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: MessageContent;
+  createdAt?: Date | string | number;
+}
+
+import {
+  ArrowUp,
+  Hammer,
+  Loader2,
+  Image as ImageIcon,
+  User,
+} from "lucide-react"; 
+import { Button } from "@/components/Ai/components/ui/button";
+import { Textarea } from "@/components/Ai/components/ui/textarea";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { atomDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
-import { CraftsmenGrid } from "@/components/ui/CraftsmenGrid";
+import { CraftsmenGrid } from "@/components/Ai/components/ui/CraftsmenGrid";
 import {
   extractCraftsmanData,
   messageContainsCraftsmanData,
-} from "@/lib/extract-craftsman-data";
+} from "@/lib/AI/extract-craftsman-data";
 import Image from "next/image";
 
 const api = "/api/chat";
@@ -315,12 +331,7 @@ export default function Chat() {
         <div className="max-w-3xl mx-auto flex items-center justify-center">
           <h1 className="text-xl font-semibold font-aboreto">
             <div className="flex items-center justify-center gap-3.5">
-              <Image
-                src={"/logo.png"}
-                alt="شعار حرفي"
-                width={50}
-                height={50}
-              />
+              <Image src={"/logo.png"} alt="شعار حرفي" width={50} height={50} />
               <p className="font-rubik text-2xl" style={{ color: "#fff" }}>
                 مساعد حرفي
               </p>
@@ -359,7 +370,9 @@ export default function Chat() {
             >
               <div
                 className={`rounded-2xl px-4 py-3 max-w-[85%] shadow-sm relative ${
-                  message.role === "user" ? "bg-white border" : "bg-white border"
+                  message.role === "user"
+                    ? "bg-white border"
+                    : "bg-white border"
                 }`}
                 style={
                   message.role === "user"
@@ -381,7 +394,6 @@ export default function Chat() {
                       }}
                     >
                       <Hammer className="w-5 h-5" />{" "}
-                      {/* Changed to Hammer icon */}
                     </div>
                     <div className="min-w-0 flex-1">
                       {processingMessageIds.has(message.id) ||
@@ -625,7 +637,6 @@ export default function Chat() {
                   overflowY: "auto",
                   backgroundColor: "transparent",
                   color: "#8D5524",
-                  placeholderColor: "#C0392B",
                 }}
               />
               <Button

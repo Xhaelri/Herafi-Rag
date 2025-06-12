@@ -1,30 +1,21 @@
-interface Craftsman {
-  id: string;
-  name: string;
-  craft: string;
-  rating?: number;
-  reviewCount?: number;
-  address?: string;
-  description?: string;
-  status?: string;
-  cities?: string;
-  completedJobs?: number;
-  activeJobs?: number;
-  image?: string | null; // Add image field
+import { Craftsman } from "@/typs";
+
+function normalizeArabicText(text: string): string {
+  return text
+    .replace(/[\u0617-\u061A\u064B-\u065F]/g, "")
+    .replace(/[\u0622\u0623\u0625]/g, "\u0627")
+    .replace(/\s+/g, " ") 
+    .trim();
 }
 
-/**
- * Check if a message contains craftsman data markers
- * @param text The message text
- */
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export function messageContainsCraftsmanData(text: string): boolean {
   return text.includes("--- المستند") && text.includes("sourceId:");
 }
 
-/**
- * Extract craftsman data from AI message text, handling run-on fields.
- * @param text The message text containing craftsman information
- */
 export function extractCraftsmanData(text: string): Craftsman[] {
   const craftsmen: Craftsman[] = [];
 
@@ -40,6 +31,8 @@ export function extractCraftsmanData(text: string): Craftsman[] {
     }
 
     try {
+      console.log("Raw docContent:", docContent);
+
       const fields = [
         { key: "name", label: "اسم الحرفي:" },
         { key: "craft", label: "المهنة:" },
@@ -50,59 +43,65 @@ export function extractCraftsmanData(text: string): Craftsman[] {
         { key: "activeJobsText", label: "الوظائف النشطة:" },
         { key: "description", label: "الوصف:" },
         { key: "statusText", label: "الحالة:" },
-        { key: "image", label: "رابط الصورة:" }, // Add image field extraction
+        { key: "image", label: "رابط الصورة:" },
         { key: "sourceId", label: "sourceId:" },
+        { key: "id", label: "id:" },
       ];
 
       const extractedRawData: Record<string, string> = {};
-      let currentPos = 0;
-
-      const firstLabelPos = docContent.indexOf(fields[0].label);
-      if (firstLabelPos === -1) {
-        console.warn(
-          "Could not find the first label 'اسم الحرفي:' in doc:",
-          docContent
-        );
-        continue;
-      }
-      currentPos = firstLabelPos;
-
       for (let i = 0; i < fields.length; i++) {
         const currentField = fields[i];
-        const nextFieldLabel =
-          i + 1 < fields.length ? fields[i + 1].label : null;
+        const nextFieldLabel = i + 1 < fields.length ? fields[i + 1].label : null;
 
-        const labelPos = docContent.indexOf(currentField.label, currentPos);
+        const fieldRegex = new RegExp(
+          `${escapeRegExp(currentField.label)}\\s*([^\\n]*?)\\s*(?=${
+            nextFieldLabel ? escapeRegExp(nextFieldLabel) : "$|\\n"
+          })`,
+          "i"
+        );
+        const fieldMatch = docContent.match(fieldRegex);
 
-        if (labelPos === -1) {
-          continue;
-        }
-
-        const valueStartPos = labelPos + currentField.label.length;
-        let valueEndPos = docContent.length;
-        if (nextFieldLabel) {
-          const nextLabelPos = docContent.indexOf(
-            nextFieldLabel,
-            valueStartPos
-          );
-          if (nextLabelPos !== -1) {
-            valueEndPos = nextLabelPos;
+        if (fieldMatch && fieldMatch[1]) {
+          const rawValue = fieldMatch[1].trim();
+          if (rawValue) {
+            extractedRawData[currentField.key] = rawValue;
           }
         }
-
-        const rawValue = docContent
-          .substring(valueStartPos, valueEndPos)
-          .trim();
-        if (rawValue) {
-          extractedRawData[currentField.key] = rawValue;
-        }
-
-        currentPos = valueStartPos;
       }
 
-      const id =
-        extractedRawData.sourceId ||
-        `fallback-${Date.now()}-${craftsmen.length}`;
+      console.log("Extracted raw data:", extractedRawData); 
+
+      let id = extractedRawData.id;
+      if (!id) {
+        const idPatterns = [
+          /id:\s*(\d+)/i,
+          /رقم الحرفي:\s*(\d+)/,
+          /رقم المعرف:\s*(\d+)/,
+          /ID:\s*(\d+)/i,
+        ];
+        for (const pattern of idPatterns) {
+          const idMatch = docContent.match(pattern);
+          if (idMatch) {
+            id = idMatch[1];
+            console.log(`Found id with pattern ${pattern}:`, id);
+            break;
+          }
+        }
+      }
+
+      if (!id) {
+        const idMatch = docContent.match(/id:\s*(\d+)/i);
+        if (idMatch) {
+          id = idMatch[1];
+          console.log("Found id in document:", id);
+        }
+      }
+
+      if (!id) {
+        id = `temp-${Date.now()}-${craftsmen.length}`;
+        console.warn("Failed to extract id, using temporary fallback:", id);
+        console.warn("Document content:", docContent);
+      }
 
       const name = extractedRawData.name || "";
       const craft = extractedRawData.craft || "";
@@ -139,7 +138,7 @@ export function extractCraftsmanData(text: string): Craftsman[] {
 
       let status = "free";
       const statusText = extractedRawData.statusText;
-      if (statusText && statusText.includes("مشغول")) {
+      if (statusText && /مشغول|busy/i.test(statusText)) {
         status = "busy";
       }
 
@@ -152,14 +151,21 @@ export function extractCraftsmanData(text: string): Craftsman[] {
         ? parseInt(activeJobsText, 10)
         : undefined;
 
-      const addressCombined = [
-        extractedRawData.addressRaw,
-        extractedRawData.cities,
-      ]
+      let cities = extractedRawData.cities
+        ? extractedRawData.cities
+            .split(",")
+            .map((city) => normalizeArabicText(city.trim()))
+            .filter((city) => city)
+            .join(", ")
+        : undefined;
+
+      const addressCombined = [extractedRawData.addressRaw]
         .filter(Boolean)
         .join(", ");
+
       craftsmen.push({
-        id,
+        id, 
+        sourceId: extractedRawData.sourceId || `fallback-${Date.now()}-${craftsmen.length}`,
         name,
         craft,
         address: addressCombined || undefined,
@@ -167,12 +173,10 @@ export function extractCraftsmanData(text: string): Craftsman[] {
         reviewCount,
         description: extractedRawData.description || undefined,
         status,
-        cities: extractedRawData.cities || undefined,
-        completedJobs: !isNaN(completedJobs as number)
-          ? completedJobs
-          : undefined,
+        cities,
+        completedJobs: !isNaN(completedJobs as number) ? completedJobs : undefined,
         activeJobs: !isNaN(activeJobs as number) ? activeJobs : undefined,
-        image: extractedRawData.image || null, // Add extracted image field
+        image: extractedRawData.image || null,
       });
     } catch (error) {
       console.error(
@@ -183,6 +187,7 @@ export function extractCraftsmanData(text: string): Craftsman[] {
       );
     }
   }
+
   if (craftsmen.length === 0 && text.includes("--- المستند")) {
     console.warn(
       "Detected document markers but failed to extract any craftsmen data."

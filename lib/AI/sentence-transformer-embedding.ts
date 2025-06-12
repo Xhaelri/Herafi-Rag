@@ -19,12 +19,6 @@ interface EmbeddingResult {
   model: string;
 }
 
-/**
- * Generates text embeddings using sentence-transformers model
- * @param text Input text to embed
- * @param options Configuration options
- * @returns Promise with embedding result
- */
 export async function generateSentenceEmbedding(
   text: string,
   options: EmbeddingOptions = {}
@@ -59,12 +53,6 @@ export async function generateSentenceEmbedding(
   }
 }
 
-/**
- * Batch generates embeddings for multiple texts
- * @param texts Array of texts to embed
- * @param options Configuration options
- * @returns Promise with array of embedding results
- */
 export async function batchGenerateSentenceEmbeddings(
   texts: string[],
   options: EmbeddingOptions = {}
