@@ -1,9 +1,15 @@
 // InputArea.tsx
 import { useEffect, useRef } from "react";
+<<<<<<< HEAD:components/Ai/components/ui/InputArea.tsx
 import { Button } from "./button";
 import { Textarea } from "./textarea";
 import { ArrowUp, Loader2, Image as ImageIcon } from "lucide-react";
 import Image from "next/image";
+=======
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { ArrowUp, Loader2, Image as ImageIcon } from "lucide-react";
+>>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/InputArea.tsx
 
 interface InputAreaProps {
   input: string;
@@ -48,7 +54,11 @@ export default function InputArea({
 
   return (
     <footer
+<<<<<<< HEAD:components/Ai/components/ui/InputArea.tsx
       className="p-4 border-t rounded-b-lg"
+=======
+      className="p-4 border-t"
+>>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/InputArea.tsx
       style={{
         backgroundColor: "#FFFFFF",
         borderTopColor: "#C0392B",
@@ -65,12 +75,19 @@ export default function InputArea({
         <div className="flex flex-col w-full">
           {imagePreview && (
             <div className="mb-2">
+<<<<<<< HEAD:components/Ai/components/ui/InputArea.tsx
               <Image
                 src={imagePreview}
                 alt="Image preview"
                 className="max-w-[100px] rounded-lg"
                 width={100}
                 height={100}
+=======
+              <img
+                src={imagePreview}
+                alt="Image preview"
+                className="max-w-[100px] rounded-lg"
+>>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/InputArea.tsx
               />
               <Button
                 type="button"

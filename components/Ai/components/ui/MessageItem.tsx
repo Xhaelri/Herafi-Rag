@@ -3,9 +3,28 @@ import { User, Hammer, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { atomDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
+<<<<<<< HEAD:components/Ai/components/ui/MessageItem.tsx
 import { CraftsmenGrid } from "./CraftsmenGrid";
 import Image from "next/image";
 import {Craftsman} from "@/typs"
+=======
+import { CraftsmenGrid } from "@/components/ui/CraftsmenGrid";
+
+interface Craftsman {
+  id: string;
+  name: string;
+  craft: string;
+  rating?: number;
+  reviewCount?: number;
+  address?: string;
+  description?: string;
+  status?: string;
+  cities?: string;
+  completedJobs?: number;
+  activeJobs?: number;
+  image?: string | null;
+}
+>>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/MessageItem.tsx
 
 interface MessageItemProps {
   message: Message;
@@ -63,7 +82,11 @@ export default function MessageItem({
     >
       <div
       
+<<<<<<< HEAD:components/Ai/components/ui/MessageItem.tsx
         className={`rounded-2xl px-4 py-3 max-w-[85%]  shadow-sm relative ${
+=======
+        className={`rounded-2xl px-4 py-3 max-w-[85%] shadow-sm relative ${
+>>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/MessageItem.tsx
           message.role === "user" ? "bg-white border" : "bg-white border"
         }`}
         style={
@@ -153,13 +176,20 @@ export default function MessageItem({
                               {part.text}
                             </ReactMarkdown>
                           ) : part.type === "image" ? (
+<<<<<<< HEAD:components/Ai/components/ui/MessageItem.tsx
                             <Image
+=======
+                            <img
+>>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/MessageItem.tsx
                               key={`${message.id}-part-${i}`}
                               src={part.image}
                               alt="Assistant provided image"
                               className="max-w-full rounded-lg mt-2"
+<<<<<<< HEAD:components/Ai/components/ui/MessageItem.tsx
                               width={200}
                               height={200}
+=======
+>>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/MessageItem.tsx
                             />
                           ) : null
                         )
@@ -193,13 +223,20 @@ export default function MessageItem({
                   message.content.map((part: any, i: number) => {
                     if (part.type === "image") {
                       return (
+<<<<<<< HEAD:components/Ai/components/ui/MessageItem.tsx
                         <Image
+=======
+                        <img
+>>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/MessageItem.tsx
                           key={`${message.id}-part-${i}`}
                           src={part.image}
                           alt="User uploaded image"
                           className="max-w-[200px] rounded-lg mt-2"
+<<<<<<< HEAD:components/Ai/components/ui/MessageItem.tsx
                           width={200}
                           height={200}
+=======
+>>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/MessageItem.tsx
                         />
                       );
                     }

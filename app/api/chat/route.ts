@@ -1,4 +1,5 @@
 import { Pinecone } from "@pinecone-database/pinecone";
+import { Pinecone } from "@pinecone-database/pinecone";
 import { generateId, generateText, Message } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateSentenceEmbedding } from "@/lib/AI/sentence-transformer-embedding";
@@ -484,6 +485,8 @@ const { PINECONE_API_KEY, PINECONE_INDEX_NAME, GOOGLE_API_KEY } = process.env;
 console.log("Environment check:", {
   hasPineconeApiKey: !!PINECONE_API_KEY,
   hasPineconeIndexName: !!PINECONE_INDEX_NAME,
+  hasPineconeApiKey: !!PINECONE_API_KEY,
+  hasPineconeIndexName: !!PINECONE_INDEX_NAME,
   hasGoogleApiKey: !!GOOGLE_API_KEY,
 });
 
@@ -491,12 +494,21 @@ console.log("Environment check:", {
 const pinecone = new Pinecone({
   apiKey: PINECONE_API_KEY!,
 });
+// Initialize Pinecone client
+const pinecone = new Pinecone({
+  apiKey: PINECONE_API_KEY!,
+});
 
 const google = createGoogleGenerativeAI({
+  apiKey: GOOGLE_API_KEY || "",
   apiKey: GOOGLE_API_KEY || "",
 });
 
 const MAX_CONTEXT_LENGTH = 30000;
+const MIN_SIMILARITY = 0.3;
+const MIN_RATING = 0;
+const EMBED_DIMENSION = 384;
+const BYPASS_SIMILARITY = false;
 const MIN_SIMILARITY = 0.3;
 const MIN_RATING = 0;
 const EMBED_DIMENSION = 384;
@@ -585,6 +597,7 @@ export async function POST(req: Request) {
 
     console.log("Generating embedding for query...");
     const embeddingResult = await generateSentenceEmbedding(augmentedQuery);
+    const embeddingResult = await generateSentenceEmbedding(augmentedQuery);
     const embeddingVector = embeddingResult.embedding;
     console.log("Embedding vector length:", embeddingVector.length);
 
@@ -592,11 +605,23 @@ export async function POST(req: Request) {
     let relevantDocsFound = false;
     let usedRelaxedFilters = false;
 
+    let usedRelaxedFilters = false;
+
     try {
       console.log("Querying vector database...");
       const index = await getVectorIndex(EMBED_DIMENSION);
       console.log(`Using index: ${PINECONE_INDEX_NAME}`);
+      const index = await getVectorIndex(EMBED_DIMENSION);
+      console.log(`Using index: ${PINECONE_INDEX_NAME}`);
 
+      const stats = await index.describeIndexStats();
+      console.log("Index stats:", {
+        totalVectorCount: stats.totalVectorCount,
+        dimension: stats.dimension,
+      });
+
+      if (stats.totalVectorCount === 0) {
+        console.warn("WARNING: No vectors found in index. Check data loading.");
       const stats = await index.describeIndexStats();
       console.log("Index stats:", {
         totalVectorCount: stats.totalVectorCount,
@@ -633,6 +658,7 @@ export async function POST(req: Request) {
           `Found ${documents.length} potential documents via vector search`
         );
 
+        // Filter documents by similarity
         let relevantDocuments = documents;
         if (documents.length > 0) {
           relevantDocuments = documents
@@ -673,6 +699,7 @@ export async function POST(req: Request) {
             });
           console.log(
             `${relevantDocuments.length} documents meet similarity (${MIN_SIMILARITY}) threshold`
+            `${relevantDocuments.length} documents meet similarity (${MIN_SIMILARITY}) threshold`
           );
         } else {
           console.log("No potential documents found.");
@@ -696,6 +723,17 @@ export async function POST(req: Request) {
               return ratingB - ratingA;
             }
             return (b._similarity || 0) - (a._similarity || 0);
+            rating: relevantDocuments[0].rating || "N/A",
+          });
+
+          // Sort by rating if similarity is bypassed, else by similarity
+          relevantDocuments.sort((a, b) => {
+            if (BYPASS_SIMILARITY) {
+              const ratingA = parseFloat(a.rating || "2");
+              const ratingB = parseFloat(b.rating || "2");
+              return ratingB - ratingA;
+            }
+            return (b._similarity || 0) - (a._similarity || 0);
           });
 
           docContext = relevantDocuments
@@ -704,6 +742,8 @@ export async function POST(req: Request) {
                 ? `(مدى الصلة: ${doc._similarity.toFixed(2)})`
                 : "(درجة الصلة غير متوفرة)";
               const title =
+                doc.name || doc.text.split("\n")[0].substring(0, 50) + "...";
+              const sourceId = doc._id || `doc-${i + 1}`;
                 doc.name || doc.text.split("\n")[0].substring(0, 50) + "...";
               const sourceId = doc._id || `doc-${i + 1}`;
               const sourceIdMetadata = `sourceId: ${sourceId}`;
@@ -732,11 +772,17 @@ export async function POST(req: Request) {
           docContext = `لم يتم العثور على ${craftType || "حرفيين"} في ${
             clientCity || "المنطقة المطلوبة"
           }. جرب مدينة أخرى أو زيارة موقع حرفي لمزيد من الخيارات.`;
+          docContext = `لم يتم العثور على ${craftType || "حرفيين"} في ${
+            clientCity || "المنطقة المطلوبة"
+          }. جرب مدينة أخرى أو زيارة موقع حرفي لمزيد من الخيارات.`;
         }
       }
     } catch (error) {
       console.error("DB query error:", error);
       console.error("Error details:", JSON.stringify(error, null, 2));
+      docContext = `حدث خطأ أثناء استرداد معلومات السياق: ${
+        error instanceof Error ? error.message : String(error)
+      }.`;
       docContext = `حدث خطأ أثناء استرداد معلومات السياق: ${
         error instanceof Error ? error.message : String(error)
       }.`;
@@ -754,7 +800,17 @@ ${docContext}
 1. **إذا طلب المستخدم حرفي محدد بشكل صريح** (مثل: "حداد"، "سباك"، "كهربائي"، "أحتاج سباك"، "أريد كهربائي"، "دلني على نجار"، "اقترح سباك"، "رشح نجار"):
     - **أولاً اسأل العميل عن المدينة التي تتواجد فيها المشكلة للبحث عن أقرب الحرفيين لسرعة حل المشكلة** (إلا إذا ذكر المدينة في الطلب).
     - **ثانياً:** ابحث بدقة في \`السياق المسترجع\` عن **قائمة حرفيين** تطابق النوع المطلوب (مثل "${craftType}").
+1. **إذا طلب المستخدم حرفي محدد بشكل صريح** (مثل: "حداد"، "سباك"، "كهربائي"، "أحتاج سباك"، "أريد كهربائي"، "دلني على نجار"، "اقترح سباك"، "رشح نجار"):
+    - **أولاً اسأل العميل عن المدينة التي تتواجد فيها المشكلة للبحث عن أقرب الحرفيين لسرعة حل المشكلة** (إلا إذا ذكر المدينة في الطلب).
+    - **ثانياً:** ابحث بدقة في \`السياق المسترجع\` عن **قائمة حرفيين** تطابق النوع المطلوب (مثل "${craftType}").
     - **إذا وجدت قائمة:** 
+      - اكتب رسالة موجزة تقول أنك وجدت حرفيين مناسبين، مثل: "وجدت لك حرفيين متخصصين في ${craftType}${
+      clientCity ? ` في ${clientCity}` : ""
+    }${
+      usedRelaxedFilters
+        ? " (تم توسيع نطاق البحث لتضمين المزيد من الخيارات)"
+        : ""
+    }:"
       - اكتب رسالة موجزة تقول أنك وجدت حرفيين مناسبين، مثل: "وجدت لك حرفيين متخصصين في ${craftType}${
       clientCity ? ` في ${clientCity}` : ""
     }${
@@ -778,7 +834,22 @@ ${docContext}
     - إذا لم تجد قائمة حرفيين في المدينة:
       - أخبر المستخدم: "لم أجد حرفيين في ${clientCity}. يمكنك زيارة موقع حرفي للعثور على حرفيين في منطقتك مع تقييمات ومراجعات المستخدمين."
     -  إذا كان السياق يحتوي على حرفيين ولكن المستخدم لم يحدد نوع الحرفي، لا تفترض نوعًا معينًا (مثل "سباك")،  اذا كان غير واضح من السياق ما الحرفة التي يحتاجها المستخدم، فاسأل المستخدم عن نوع الحرفي المطلوب.
+    - **إذا لم تجد قائمة:** أخبر المستخدم بوضوح أنك لم تعثر على ${craftType} في ${
+      clientCity || "المنطقة المطلوبة"
+    }، ثم اقترح عليه استخدام موقع "حرفي" للبحث عن ${craftType} مناسب. مثال: "لم أجد ${craftType} في ${
+      clientCity || "المنطقة المطلوبة"
+    }. يمكنك زيارة موقع حرفي للعثور على ${craftType} في منطقتك مع تقييمات ومراجعات المستخدمين."
 
+2. **إذا ذكر المستخدم مدينة فقط دون تحديد نوع الحرفي** (مثل: "طلخا"):
+    - إذا وجدت قائمة حرفيين في المدينة في \`السياق المسترجع\`:
+      - اكتب رسالة موجزة تقول: "وجدت لك مجموعة من الحرفيين المتاحين في ${clientCity}:"
+      - ثم احتفظ بتنسيق المستندات الأصلي مع بداية كل مستند بـ "--- المستند" ونهايته بـ "--- نهاية المستند" لعرض جميع الحرفيين في بطاقات.
+      - لا تكرر معلومات الحرفيين في نص رسالتك.
+    - إذا لم تجد قائمة حرفيين في المدينة:
+      - أخبر المستخدم: "لم أجد حرفيين في ${clientCity}. يمكنك زيارة موقع حرفي للعثور على حرفيين في منطقتك مع تقييمات ومراجعات المستخدمين."
+    -  إذا كان السياق يحتوي على حرفيين ولكن المستخدم لم يحدد نوع الحرفي، لا تفترض نوعًا معينًا (مثل "سباك")،  اذا كان غير واضح من السياق ما الحرفة التي يحتاجها المستخدم، فاسأل المستخدم عن نوع الحرفي المطلوب.
+
+3. **إذا كان طلب المستخدم يتعلق بحل مشكلة منزلية أو استفسار عام** (ولم يطلب حرفي بشكل صريح):
 3. **إذا كان طلب المستخدم يتعلق بحل مشكلة منزلية أو استفسار عام** (ولم يطلب حرفي بشكل صريح):
     - حاول أولاً تقديم نصائح عملية وخطوات لمساعدته على حل المشكلة بنفسه.
     - استعن بـ \`السياق المسترجع\` إن كان يحتوي على معلومات مفيدة لدعم النصيحة.
@@ -804,6 +875,10 @@ ${docContext}
     - أنت مساعد ذكي خاص بموقع حرفي، إذا طلب العميل مكان آخر للبحث عن حرفيين فأنت لا تعرف سوى موقع حرفي وتقترحه عليه
     - إذا سأل أحد العملاء عن موقع حرفي، يجب أن يكون الرد بشكل مناسب ويبرز أهمية المنصة، مثال: منصة حرفي بتوصلك مباشرة بأفضل الحرفيين في منطقتك في مختلف التخصصات زي السباكة والكهرباء والنجارة وغيرهم. تقدر تستعرض تقييمات وتجارب كل المستخدمين سواء كانت إيجابية أو سلبية بكل شفافية، وتعرض مشكلتك عشان تستقبل عروض من أكتر من حرفي، وتفاوض على السعر براحتك، وتختار العرض الأنسب ليك. القرار في إيدك وإنت المتحكم في كل خطوة
     - أنت تمتلك القدرة على الوصول مباشرةً إلى قاعدة بيانات موقع حرفي للبحث عن حرفيين. لذلك، عندما يطلب منك العميل أن تبحث عن حرفيين، مثال: سباك، حداد، نجار .. إلخ يمكنك عرض بطاقات الحرفيين الموجودة لديك في نفس السياق
+6. **نقاط هامة:**
+    - أنت مساعد ذكي خاص بموقع حرفي، إذا طلب العميل مكان آخر للبحث عن حرفيين فأنت لا تعرف سوى موقع حرفي وتقترحه عليه
+    - إذا سأل أحد العملاء عن موقع حرفي، يجب أن يكون الرد بشكل مناسب ويبرز أهمية المنصة، مثال: منصة حرفي بتوصلك مباشرة بأفضل الحرفيين في منطقتك في مختلف التخصصات زي السباكة والكهرباء والنجارة وغيرهم. تقدر تستعرض تقييمات وتجارب كل المستخدمين سواء كانت إيجابية أو سلبية بكل شفافية، وتعرض مشكلتك عشان تستقبل عروض من أكتر من حرفي، وتفاوض على السعر براحتك، وتختار العرض الأنسب ليك. القرار في إيدك وإنت المتحكم في كل خطوة
+    - أنت تمتلك القدرة على الوصول مباشرةً إلى قاعدة بيانات موقع حرفي للبحث عن حرفيين. لذلك، عندما يطلب منك العميل أن تبحث عن حرفيين، مثال: سباك، حداد، نجار .. إلخ يمكنك عرض بطاقات الحرفيين الموجودة لديك في نفس السياق
 
 هدفك هو جعل تجربة المستخدم سهلة وفعالة، مع إعطاء الأولوية لمساعدته في اتخاذ قرار مناسب سواء عبر نصيحة عملية أو توصية بحرفي من السياق.
 `;
@@ -817,6 +892,12 @@ ${docContext}
     const debugInfo = relevantDocsFound
       ? `[DEBUG: Found ${
           docContext.split("--- المستند").length - 1
+        } relevant documents${clientCity ? ` in ${clientCity}` : ""}${
+          usedRelaxedFilters ? " (using relaxed filters)" : ""
+        }]`
+      : `[DEBUG: No relevant documents found in the database${
+          clientCity ? ` for ${clientCity}` : ""
+        }]`;
         } relevant documents${clientCity ? ` in ${clientCity}` : ""}${
           usedRelaxedFilters ? " (using relaxed filters)" : ""
         }]`

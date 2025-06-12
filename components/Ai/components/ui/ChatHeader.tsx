@@ -1,6 +1,10 @@
 // ChatHeader.tsx
 import Image from "next/image";
+<<<<<<< HEAD:components/Ai/components/ui/ChatHeader.tsx
 import icon from "@/assets/char-blob.png"
+=======
+
+>>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatHeader.tsx
 export default function ChatHeader() {
   return (
     <header
@@ -15,7 +19,11 @@ export default function ChatHeader() {
         <h1 className="text-xl font-semibold font-aboreto">
           <div className="flex items-center justify-center gap-3.5">
             <Image
+<<<<<<< HEAD:components/Ai/components/ui/ChatHeader.tsx
               src={icon}
+=======
+              src={"/logo.png"}
+>>>>>>> 8964f1a99377932b293d7fab7da34f12d318c4c0:components/ui/ChatHeader.tsx
               alt="شعار حرفي"
               width={50}
               height={50}
